@@ -19,4 +19,4 @@ Status:
   *  One-wire library written for Arduino with all functions excewpt, parasitic operation and alarms.
   *  Arduino sketches written to interface with multiple devices, make temperature readings, scan for new devices,
   Store ROM code and descriptions in EEPROM, remove a device from EEPROM, and edit descriptions.
-    
+  *  Auxiliary sketches for writing to and reading from EEPROM
