@@ -15,7 +15,8 @@ Goals:
 * ATmega and Raspberry Pi to communicate with each other by undetermined means - probably RF
 
 Status:
-  June 12, 2014:  One-wire library written for Arduino with all functions excewpt, parasitic operation and alarms.
-    Arduino sketches written to interface with multiple devices, make temperature readings, scan for new devices,
-    Store ROM code and descriptions in EEPROM, remove a device from EEPROM, and edit descriptions.
+  June 12, 2014:  
+  *  One-wire library written for Arduino with all functions excewpt, parasitic operation and alarms.
+  *  Arduino sketches written to interface with multiple devices, make temperature readings, scan for new devices,
+  Store ROM code and descriptions in EEPROM, remove a device from EEPROM, and edit descriptions.
     
