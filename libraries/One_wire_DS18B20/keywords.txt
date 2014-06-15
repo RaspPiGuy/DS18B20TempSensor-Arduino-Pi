@@ -1,0 +1,15 @@
+DS18B20_INTERFACE	KEYWORD1
+calculateCRC_byte	KEYWORD2
+initialize	KEYWORD2
+read_rom	KEYWORD2
+skip_rom	KEYWORD2
+match_rom	KEYWORD2
+read_scratchpad	KEYWORD2
+convert_t	KEYWORD2
+write_scratchpad	KEYWORD2
+search_rom	KEYWORD2
+master_write0	KEYWORD2
+master_write1	KEYWORD2
+write_byte	KEYWORD2
+master_read	KEYWORD2
+read_byte	KEYWORD2
