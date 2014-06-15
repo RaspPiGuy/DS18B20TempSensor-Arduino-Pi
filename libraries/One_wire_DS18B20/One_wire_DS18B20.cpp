@@ -1,11 +1,16 @@
 
 /*  
-Please see Maxim's datasheet for this device to understand the functionality of the 1-wire interface and the device itself.
+Please see Maxim's datasheet for this device to understand the functionality of 
+the 1-wire interface and the device itself.
 
 http://datasheets.maximintegrated.com/en/ds/DS18B20.pdf
 
-To understand the functions in this file, it important that you know how ATmega328 register programming is done.  Please visit my blog entry of January 19, 2014, "Gertboard - Programming With ATmega Registers",
-subtitled "Arduino IDE Built-in Functions Vrs. Direct Register Programming"
+To understand the functions in this file, it important that you know how 
+ATmega328 register programming is done.  
+
+Please visit my blog entry of January 19, 2014, "Gertboard - Programming With 
+ATmega Registers", subtitled "Arduino IDE Built-in Functions Vrs. Direct Register
+Programming"
 
 http://thepiandi.blogspot.com/2014/01/gertboard-programming-with-atmega.html
 
@@ -21,7 +26,10 @@ DS18B20_INTERFACE::DS18B20_INTERFACE(){
 
 //-----------------------calculateCRC_byte()------------------------------------
 
-/* The CRC is checked after reading the ROM code and and reading the scrathpad.  The DS18B20 device appends its internal calculation of the CRC as the last byte of the ROM code. If the result of the CRC is "0", after passing in all the bits the CRC passes. */
+/* The CRC is checked after reading the ROM code and reading the scrathpad.  
+The DS18B20 device appends its internal calculation of the CRC as the last byte 
+of the ROM code and the scratchpad. If the result of the CRC is "0", after 
+passing in all the bits the CRC passes. */
 
 boolean DS18B20_INTERFACE::calculateCRC_byte(byte inByte[], int num_bytes){
   byte workingByte[num_bytes];
@@ -44,8 +52,10 @@ boolean DS18B20_INTERFACE::calculateCRC_byte(byte inByte[], int num_bytes){
 
 /* Function called by user.
 
-Initialization precedes all command sequences.  The data pin is pulled low for 500us. then the pin switched to input. After 75usec. the data pin is read.
-If "0" is read, initialization passes.  The entire initialization process is programmed to take 1ms. */
+Initialization precedes all command sequences.  The data pin is pulled low for 
+500us. then the pin switched to input. After 75usec. the data pin is read.
+If "0" is read, initialization passes.  The entire initialization process is 
+programmed to take 1ms. */
 
 boolean DS18B20_INTERFACE::initialize(){
   boolean failure = false;  
@@ -63,7 +73,9 @@ boolean DS18B20_INTERFACE::initialize(){
 
 //-----------------------master_write0()-----------------------------------
 
-/* A "0" is written to the DS18B20 by the pulling the data pin low for 60usec. and then releasing it (make data pin an input). An additional 7usec. makes this operation one time slot long. */
+/* A "0" is written to the DS18B20 by the pulling the data pin low for 60usec. 
+and then releasing it (make data pin an input). An additional 7usec. makes 
+this operation one time slot long. */
  
 void DS18B20_INTERFACE::master_write0(){  
   PORT &= !(1 << PORT_PIN);  //Data pin = 0    
@@ -75,7 +87,9 @@ void DS18B20_INTERFACE::master_write0(){
 
 //-------------------------master_write1()------------------------------------
 
-/* A "1" is written to the DS18B20 by the pulling the data pin low for 13usec. and then releasing it (make data pin an input). An additional 54usec. makes this operation one time slot long. */
+/* A "1" is written to the DS18B20 by the pulling the data pin low for 13usec. 
+and then releasing it (make data pin an input). An additional 54usec. makes 
+this operation one time slot long. */
 
 void DS18B20_INTERFACE::master_write1(){  
   PORT &= !(1 << PORT_PIN);  //Data pin = 0     
@@ -86,7 +100,10 @@ void DS18B20_INTERFACE::master_write1(){
 }  
 //-------------------------write_byte()-----------------------------------------
 
-/* Writing a byte is done least significant bit first.  The least significant bit is tested by seeing if the byte is even or odd using modulo 2.  If odd, master_write1 is called, if not, master_write0 is called.  A right shift is done to move all the bits down one position. This is repeated until all 8 bits are handled. */
+/* Writing a byte is done least significant bit first.  The least significant bit
+ is tested by seeing if the byte is even or odd using modulo 2.  If odd, 
+master_write1 is called, if not, master_write0 is called.  A right shift is done 
+to move all the bits down one position. This is repeated until all 8 bits are handled. */
 
 void DS18B20_INTERFACE::write_byte(byte dataword){  
   for (int i=0; i<8; i++){    
@@ -101,7 +118,10 @@ void DS18B20_INTERFACE::write_byte(byte dataword){
 }
 //--------------------------master_read()---------------------------------------
 
-/* This constitutes a read timeslot and reads one bit sent by the DS18B20.  The data pin is pulled low for 5 usec. then released. Data pin is read 6 usec. later to determine if the DS18B20 has pulled it low or left it high.  Time slot continues for 50usec. more. */
+/* This constitutes a read timeslot and reads one bit sent by the DS18B20.  The 
+data pin is pulled low for 5 usec. then released. Data pin is read 6 usec. later 
+to determine if the DS18B20 has pulled it low or left it high.  Time slot continues 
+for 50usec. more. */
   
 byte DS18B20_INTERFACE::master_read(){  
   byte ret_val;  
@@ -116,7 +136,9 @@ byte DS18B20_INTERFACE::master_read(){
 }
 //-------------------------read_byte()------------------------------------------
 
-/* Since the DS18B20 transmits least significant bit first, each bit is entered as a "0" or "1" in the most significant bit position and all the bits are shifted right one position.  Repeated until all 8 bits are read.*/
+/* Since the DS18B20 transmits least significant bit first, each bit is entered 
+as a "0" or "1" in the most significant bit position and all the bits are shifted 
+right one position.  Repeated until all 8 bits are read.*/
   
 byte DS18B20_INTERFACE::read_byte(){
   byte dataword = 0;
@@ -132,9 +154,11 @@ byte DS18B20_INTERFACE::read_byte(){
 
 /* Function called by user.
 
-WARNING: Do not use this function if more than one device is connected to the 1-wire bus.
+WARNING: Do not use this function if more than one device is connected to the 
+1-wire bus.
 
-The ROM code is 8 bytes long including the CRC byte.  Eight bytes are read from the DS18B20. Each byte becomes an element in an array.  The CRC should be checked after this function.
+The ROM code is 8 bytes long including the CRC byte.  Eight bytes are read from
+ the DS18B20. Each byte becomes an element in an array.  The CRC should be checked after this function.
 */
 
 void DS18B20_INTERFACE::read_rom(byte rom_value[]){
@@ -147,8 +171,6 @@ void DS18B20_INTERFACE::read_rom(byte rom_value[]){
 
 /* Function called by user.
 
-WARNING: Do not use this function if more than one device is connected to the 1-wire bus.
-
 Skip ROM allows commands to be sent without sending the ROM contents.
 Initialization must be sent before this command.*/
 
@@ -159,7 +181,9 @@ void DS18B20_INTERFACE::skip_rom(){
 
 /* Function called by user.
 
-Match rom precedes a convert temperature or a read scratchpad command.  Its purpose is to send the ROM code to the DS18B20. Initialization must be sent before this command. */
+Match rom precedes a convert temperature or a read scratchpad command.  Its purpose
+is to send the ROM code to the DS18B20. Initialization must be sent before this 
+command. */
 
 void DS18B20_INTERFACE::match_rom(byte rom_value[]){
   write_byte(0x55);
@@ -172,7 +196,9 @@ void DS18B20_INTERFACE::match_rom(byte rom_value[]){
 /* 
 Function called by user.
 
-Reading the scratchpad is done after a skip rom or match rom.  It reads 9 bytes from the DS18B20.  The last byte is the CRC byte.  The 9 bytes become elements in an array.  The CRC should be checked after this function. */
+Reading the scratchpad is done after a skip rom or match rom.  It reads 9 bytes
+from the DS18B20.  The last byte is the CRC byte.  The 9 bytes become elements in
+an array.  The CRC should be checked after this function. */
 
 void DS18B20_INTERFACE::read_scratchpad(byte scratchpad_value[]){  
   write_byte(0xBE);
@@ -184,8 +210,9 @@ void DS18B20_INTERFACE::read_scratchpad(byte scratchpad_value[]){
 
 /* Function called by user.
 
-This commands the DS18B20 to make a voltage reading, convert that reading to temperature, and store that value in the two most significant bytes of the scratchpad.  After writing the code to command the convert temperature process, a read timeslot is initiated every ms.  Once a "1" is received, the function exits with the number of ms. returned to the calling program. If the number of ms. is zero (data pin never went to "0"), the conversion never took place.  If it stays "0" for more than 2 seconds, the function does not wait any longer and exits.  The conditions of time of zero or more than 2000 should be tested
-for and declared a fail situation. */
+This commands the DS18B20 to make a voltage reading, convert that reading to 
+temperature, and store that value in the two most significant bytes of the scratchpad.  After writing the code to command the convert temperature process, a read timeslot is initiated every ms.  Once a "1" is received, the function exits with the number of ms. returned to the calling program. If the number of ms. is zero (data pin never went to "0"), the conversion never took place.  If it stays "0" for more than 2 seconds, the function does not wait any longer and exits.  The conditions of time of zero or more than 2000 should be tested
+for by the calling program and declared a failed situation. */
  
 int DS18B20_INTERFACE::convert_t(){
   byte value;
@@ -206,7 +233,11 @@ int DS18B20_INTERFACE::convert_t(){
 
 /* Function called by user.
 
-This command writes three bytes to the scratchpad.  The first byte is the upper temperature threshold, the second is the lower temperature threshold, and the third is the configuration byte.  The configuration byte has only two useful bits and they are used to set the resolution as 9, 10, 11, or 12 bits.  Skip rom or match rom must be sent before this command.
+This command writes three bytes to the scratchpad.  The first byte is the upper 
+temperature threshold, the second is the lower temperature threshold, and the third 
+is the configuration byte.  The configuration byte has only two useful bits and 
+they are used to set the resolution as 9, 10, 11, or 12 bits.  Skip rom or match 
+rom must be sent before this command.
 */
 
 void DS18B20_INTERFACE::write_scratchpad(byte alarm_and_configuration[]){
@@ -229,7 +260,7 @@ If this is the first time the function is run, Rom_no will contain eight
 zeros and LastDescrepancy will be 0.  If this function finds a device, it
 is called again with the last values of Rom_no and LastDescrepancy.  If the
 function finds the last device connected to 1-wire, Lastdescrepancy will be
-zaero.
+zero.  The ROM code of the newly discovered device goes into the array New_Rom_no.  
 */
 
 int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDescrepancy){
