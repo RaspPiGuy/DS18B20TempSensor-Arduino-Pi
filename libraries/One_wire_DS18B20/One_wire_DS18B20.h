@@ -12,39 +12,45 @@ MJL - thepiandi.blogspot.com  05/09/14
 #define DS18B20_INTERFACE_H
 
 #include "Arduino.h"
+#include <avr/io.h>
 
 /* Clock factor is to correct delayMicrosecond.  For Gertboard use .67.
 For Arduion use 1 */
 
 #define CLOCK_FACTOR 1.0
 
-/* We need to define which ATmega328 pin to use to control the 
-DS18B20. See Atmega328 datasheet pages 91 and 92 register names.
-This controls the following 5 selections: */
+/* We need to define which ATmega328 pins to use to control the 
+DS18B20s and the hard pull-up for parasitic operation. See Atmega328 datasheet 
+pages 91 and 92 register names. This controls the following 10 selections: */
 
-/*PORT_PIN is the number of the ATmega328 pin within the port you have
+/*PORT_PIN and PORT_PIN_1 are the numbers of the ATmega328 pin within the port you have
 selected.  The choices are 0 - 7. PB5 would be 5 */
 
-#define PORT_PIN 0
+#define PORT_PIN 0     //For DS18B20 data pins
+#define PORT_PIN_1 1   //For Hard Pull-up transistor
 
-/* DDR is the data direction register for ATmega328 pin you select.
+/* DDR is the data direction register for ATmega328 pins you select.
 Choices are DDRB, DDRC, and DDRD */
 
-#define DDR DDRB
+#define DDR DDRB       //For DS18B20 data pins
+#define DDR_1 DDRB     //For Hard Pull-up transistor
 
 /* PORT is the port data register controlling the ATmega328
-pin you have connected to the DS18B20. Choices are PORTB, PORTC,
-and PORTD */
+pinS you have connected to the DS18B20 and the hard pull-up transistor. 
+Choices are PORTB, PORTC, and PORTD */
 
-#define PORT PORTB
+#define PORT PORTB       //For DS18B20 data pins
+#define PORT_1 PORTB     //For Hard Pull-up transistor	
 
-/* PIN is the input register for the ATmega328 pin you select. 
+/* PIN is the input register for the ATmega328 pin you select for the DS18B20 devices. Not necessary
+for hard pull-up transistor. 
 Choices are PINB, PINC, and PIND */
 
 #define PIN PINB
 
 /*DATAMASK selects the ATmega328 pin you have selected to connect to the 
-DS18B20.  For example, if you are using pin PB3, use 0b00000100 */
+DS18B20.  Not necessary for hard pull-up transistor. 
+For example, if you are using pin PB3, use 0b00000100 */
 
 #define DATAMASK 0b00000001
 
@@ -58,7 +64,7 @@ class DS18B20_INTERFACE{
     void skip_rom();
     void match_rom(byte rom_value[]);
     void read_scratchpad(byte scratchpad_value[]);
-    int convert_t();
+    int convert_t(boolean parasitic, int resolution);
     void write_scratchpad(byte alarm_and_configuration[]);
     int search_rom(byte Rom_no[], byte New_Rom_no[], int LastDescrepancy);
  

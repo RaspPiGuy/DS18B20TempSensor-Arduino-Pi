@@ -23,7 +23,6 @@ MJL - thepiandi.blogspot.com  05/09/14
 DS18B20_INTERFACE::DS18B20_INTERFACE(){
 }
 
-
 //-----------------------calculateCRC_byte()------------------------------------
 
 /* The CRC is checked after reading the ROM code and reading the scrathpad.  
@@ -211,22 +210,45 @@ void DS18B20_INTERFACE::read_scratchpad(byte scratchpad_value[]){
 /* Function called by user.
 
 This commands the DS18B20 to make a voltage reading, convert that reading to 
-temperature, and store that value in the two most significant bytes of the scratchpad.  After writing the code to command the convert temperature process, a read timeslot is initiated every ms.  Once a "1" is received, the function exits with the number of ms. returned to the calling program. If the number of ms. is zero (data pin never went to "0"), the conversion never took place.  If it stays "0" for more than 2 seconds, the function does not wait any longer and exits.  The conditions of time of zero or more than 2000 should be tested
-for by the calling program and declared a failed situation. */
+temperature, and store that value in the two most significant bytes of the scratchpad. 
  
-int DS18B20_INTERFACE::convert_t(){
-  byte value;
-  int count = -1;
-  write_byte(0x44);
-  do{
-    count++;
-    if (count > 2000){
-      break;
-    }
-    value = master_read();
-    delay(1);
-  } while (value == 0); 
-  return (count * 1); 
+For non-parasitic operation, After writing the code to command the convert temperature 
+process, a read timeslot is initiated every ms.  Once a "1" is received, the function 
+exits with the number of ms. returned to the calling program. If the number of ms. 
+is zero (data pin never went to "0"), the conversion never took place.  If it stays "0" 
+for more than 2 seconds, the function does not wait any longer and exits.  
+The conditions of time of zero or more than 2000 should be tested
+for by the calling program and declared a failed situation. 
+
+For parasitic operation, the DS18B20'S data pin must be held high for the duration of the 
+maximum time specified for each resolution.  The resistor pull-up does not provide 
+sufficient current for that operation so a transistor is turned on that pulls the DS18B20's 
+data pin up to Vcc.  This is called a hard pull-up.  In parasitic mode, the function
+does not return anything.
+*/
+ 
+int DS18B20_INTERFACE::convert_t(boolean parasitic, int resolution){
+	if (parasitic){
+  	PORT_1 &= !(1 << PORT_PIN_1); //Data pin for hard pull-up pulled low
+		write_byte(0x44);
+		DDR_1 |= (1 << PORT_PIN_1);   //Pin controlling hard pull-up is output truning transistor on
+		delay(94 * pow(2, (resolution - 9)));
+		DDR_1 &= (1 << PORT_PIN_1);   //Pin controlling hard pull-up is input turning transistor off
+	}
+	else{
+		byte value;
+		int count = -1;
+		write_byte(0x44);
+		do{
+			count++;
+			if (count > 2000){
+				break;
+			}
+			value = master_read();
+			delay(1);
+		} while (value == 0); 
+		return (count); 
+	}
 }
 
 //-------------------------------write_scratchpad()-----------------------------

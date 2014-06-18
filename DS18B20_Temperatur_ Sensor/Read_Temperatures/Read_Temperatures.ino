@@ -8,14 +8,15 @@ Everything but the kitchen sink program to read temperatures from the DS18B20 de
 4.    Asks what the delay berween measurements is to be.  Asks hours, minutes, seconds, milliseconds
 5.    Asks how many bits of resolution 9 - 12 possible
 6.    Asks if it OK to run.  If not, program returns to step 2. above.
+7.    Asks if to run parasitic power.
 
-7.    Runs two loops, one for each measurement, and the inner loop, one for each device to be run.
-8.    For each measurement retrieves ROM code from EEPROM and runs the following DS18B20 commands:
-8.a.    Initialize, match rom, write scratchpad with resolution (alarm limits set to max and min).
-8.b.    Initialize, match rom, convert t, read scratchpad, CRC on scratchpad.
-9.    Temperature is calculated from scratch pad and displayed in deg F.
-10.   When the run is completed, the average is displayed for each device run.
-11.   Other parameters and diagnostic information are displayed.
+8.    Runs two loops, one for each measurement, and the inner loop, one for each device to be run.
+9.    For each measurement retrieves ROM code from EEPROM and runs the following DS18B20 commands:
+9.a.    Initialize, match rom, write scratchpad with resolution (alarm limits set to max and min).
+9.b.    Initialize, match rom, convert t, read scratchpad, CRC on scratchpad.
+10.    Temperature is calculated from scratch pad and displayed in deg F.
+11.   When the run is completed, the average is displayed for each device run.
+12.   Other parameters and diagnostic information are displayed.
 
 Uses the One_wire_DS18B20 library functions for basic one wire operation.
 The EEPROM_Functions library is used to read the device's ROM code and description from EEPROM.
@@ -116,6 +117,7 @@ void read_temperature(int stored_devices){
   byte res_byte;
   int number_of_devices_to_run;
   int hours, minutes, seconds, milliseconds;
+  boolean parasitic = false;
   
   boolean devices2run[stored_devices];
   float averages[stored_devices];
@@ -175,7 +177,10 @@ void read_temperature(int stored_devices){
     res_byte = 0x1F + 0x10 * 2 * (byte(resolution) - 9);  
     Serial.println("");
     
-    Serial.println("OK To Make Run? ");
+    Serial.println("Parasitic Operation?");
+    parasitic = yes_or_no();
+    
+    Serial.println("\nOK To Make Run? ");
     make_run = yes_or_no();
     if (!make_run){
       Serial.println("");
@@ -183,7 +188,7 @@ void read_temperature(int stored_devices){
       
   }while (!make_run);
   Serial.println("");
-
+   
   //Main measurement loop
   for (i = 0; i < measurements; i++){
     Serial.print("Measurement: ");
@@ -217,7 +222,7 @@ void read_temperature(int stored_devices){
             //Match ROM followed by Convert T
             if (ds18b20.initialize()) init_failures++; 
             ds18b20.match_rom(rom);
-            ds18b20.convert_t();
+            ds18b20.convert_t(parasitic, resolution);
             
             //Match ROM followed by Read Scratchpad
             if (ds18b20.initialize()) init_failures++; 
@@ -259,7 +264,10 @@ void read_temperature(int stored_devices){
       Serial.println(" degF");      
     }
   }
-  Serial.print("\nResolution: ");
+  Serial.print("\nParasitic Operation? ");
+  if (parasitic) Serial.println("Yes");
+  else Serial.println("No");
+  Serial.print("Resolution: ");
   Serial.print(resolution);
   Serial.println(" bits.");
   Serial.print("Number of measurements: ");
