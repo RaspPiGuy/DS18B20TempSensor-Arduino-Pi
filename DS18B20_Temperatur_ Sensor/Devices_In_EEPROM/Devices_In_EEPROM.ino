@@ -1,7 +1,7 @@
 /*  Devices_In_EEPROM.ino    thepiandi@blogspot.com       MJL  060614
 
-1.  Retrieves number of devices stored in the EEPROM by querying location 3 in the EEPROM
-2.  For each device, the ROM code and the description is displayed
+1.  Retrieves number of devices stored in the EEPROM by querying location 3 in the EEPROM.
+2.  For each device, the ROM code and the description is displayed.
 
 The EEPROM_Functions library is used to read the device's ROM code and description from EEPROM.
 */
