@@ -67,7 +67,9 @@ class DS18B20_INTERFACE{
     int convert_t(boolean parasitic, int resolution);
     void write_scratchpad(byte alarm_and_configuration[]);
     int search_rom(byte Rom_no[], byte New_Rom_no[], int LastDescrepancy);
- 
+		void copy_scratchpad(boolean parasitic);
+		int recall_eeprom();
+		boolean read_power_supply();
   private:
     void master_write0();
     void master_write1();

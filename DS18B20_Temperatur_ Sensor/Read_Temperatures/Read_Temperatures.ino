@@ -1,4 +1,4 @@
-/*  Read_Temperatures.ino    thepiandi@blogspot.com       MJL  060614
+/*  Read_Temperatures.ino    thepiandi@blogspot.com       MJL  062114
 
 Everything but the kitchen sink program to read temperatures from the DS18B20 device.  Program:
 1.    Displays the description and device number of all the devices in EEPROM
@@ -72,7 +72,7 @@ boolean yes_or_no(){
   boolean yes_no = false;
   char keyboard_entry[5];
   do{
-    Serial.println("Please enter Y or y, or N or n/n");        
+    Serial.println("Please enter Y or y, or N or n");        
     while (!Serial.available() > 0);
     Serial.readBytesUntil('\n',keyboard_entry, 5);
     if (keyboard_entry[0] == 'Y' || keyboard_entry[0] == 'y'){
@@ -105,6 +105,7 @@ long how_many(long lower_limit, long upper_limit){
 void read_temperature(int stored_devices){
   byte rom[8];
   byte scratchpad[9];
+  int description[12];
   byte alarm_and_config[3] = {0x7D, 0xC9, 0x7F};
   float temp_c, temp_f;
   int address;
@@ -114,25 +115,45 @@ void read_temperature(int stored_devices){
   boolean make_run = false;
   int init_failures = 0;
   int crc_errors = 0;
-  byte res_byte;
   int number_of_devices_to_run;
   int hours, minutes, seconds, milliseconds;
   boolean parasitic = false;
-  
+  int high_alarm, low_alarm;
+  boolean display_scratchpad;
+  int spaces;
   boolean devices2run[stored_devices];
   float averages[stored_devices];
+  int character;
+  
   number_of_devices_to_run = stored_devices;
   
-  //Interfce with user. Keep in loop until user is satisfied with choices
+  //Interface with user. Keep in loop until user is satisfied with choices
   do{
     //Set up array for devices to run as all true  
     for (i = 0; i < stored_devices; i++){
       devices2run[i] = true;
       averages[i] = 0;
     }
-    //Ask if all devices are to be run.  If Yes do nothing otherwise query each device
+    /*Ask if all devices are to be run.  If Yes determine if any device is 
+    connected using parasitic power, otherwise query each device and determine
+    if the selected device is connected using parasitic power.*/
     Serial.println("Run all devices? ");
-    if (!yes_or_no()){  //If no is selected this will be true
+    if (yes_or_no()){  //If yes is selected this will be true
+      if (ds18b20.initialize()){
+        Serial.println("Initialization Failure on Read_Power_Supply");
+      }
+      else{
+        ds18b20.skip_rom();
+        if (ds18b20.read_power_supply()){
+          Serial.println("\nNo device is connected using parasitic power\n");
+        }
+        else{
+          Serial.println("\nA device is connected using parasitic power\n");
+          parasitic = true;
+        }
+      }     
+    }
+    else{  //No was selected so query for each device.
       for (i = 0; i < stored_devices; i++){
         Serial.print("\nRun device number ");  
         Serial.print(i + 1);
@@ -141,46 +162,66 @@ void read_temperature(int stored_devices){
         if (!yes_or_no()){  //If answer is no, make array entry for device false
           devices2run[i] = false;
           number_of_devices_to_run--;
-        }     
+        } 
+        else{  //Determine if it is connected using parasitic power
+          if (ds18b20.initialize()){
+            Serial.println("Initialization Failure");
+          }
+          else{
+            address = 20 * i +4;   //Get ROM code from EEPROM
+            for (k = 0; k < 8; k++){   
+              rom[k] = eeprom.EEPROM_read(address +k);
+            } 
+            ds18b20.match_rom(rom); 
+            if (!ds18b20.read_power_supply()){  //A zero means parasitic
+              parasitic = true;
+            }
+          }
+        }
       }
+      if (parasitic){
+        Serial.println("\nA device is connected using parasitic power");
+      }  
+      else{
+        Serial.println("\nNo device is connected using parasitic power");
+      }    
       Serial.println("");
     }
-    else{
-      Serial.println("");
-    }
-    //Ask number of measurements, time between measurements and resolution
+
+    //Ask number of measurements, time between measurements
     Serial.print("How many measurements would you like to make? ");
     measurements = how_many(1, 10000000);
     Serial.println(measurements);
+
+    //If we only make one measurement we will not ask for time between measurements
+    if (measurements > 1){  
+      Serial.print("\nHow much time between measurements in hours? ");
+      hours = how_many(0, 10000000);
+      Serial.println(hours);
+      
+      Serial.print("How much time between measurements in minutes? ");
+      minutes = how_many(0, 60);
+      Serial.println(minutes);
+      
+      Serial.print("How much time between measurements in seconds? ");
+      seconds = how_many(0, 60);
+      Serial.println(seconds);
+      
+      Serial.print("How much time between measurements in ms.? ");
+      milliseconds = how_many(0, 1000);
+      Serial.println(milliseconds);
+      
+      delay_between_measurements = hours * 60 *60 *1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds; 
+    }
+    else{
+      delay_between_measurements = 0;
+    } 
   
-    Serial.print("\nHow much time between measurements in hours? ");
-    hours = how_many(0, 10000000);
-    Serial.println(hours);
-    
-    Serial.print("How much time between measurements in minutes? ");
-    minutes = how_many(0, 60);
-    Serial.println(minutes);
-    
-    Serial.print("How much time between measurements in seconds? ");
-    seconds = how_many(0, 60);
-    Serial.println(seconds);
-    
-    Serial.print("How much time between measurements in ms.? ");
-    milliseconds = how_many(0, 1000);
-    Serial.println(milliseconds);
-    
-    delay_between_measurements = hours * 60 *60 *1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds; 
-  
-    Serial.print("\nHow many bits of resolution, 9 - 12? ");
-    resolution = how_many(9, 12);
-    Serial.println(resolution); 
-    res_byte = 0x1F + 0x10 * 2 * (byte(resolution) - 9);  
+    Serial.print("\nDisplay alarm temperatures and resolution? ");
+    display_scratchpad = yes_or_no();
     Serial.println("");
     
-    Serial.println("Parasitic Operation?");
-    parasitic = yes_or_no();
-    
-    Serial.println("\nOK To Make Run? ");
+    Serial.println("OK To Make Run? ");
     make_run = yes_or_no();
     if (!make_run){
       Serial.println("");
@@ -190,35 +231,70 @@ void read_temperature(int stored_devices){
   Serial.println("");
    
   //Main measurement loop
-  for (i = 0; i < measurements; i++){
+  //Run for each measurement
+  for (i = 0; i < measurements; i++){  
     Serial.print("Measurement: ");
     Serial.println(i + 1);
-    for (j = 0; j < stored_devices; j++){
+    //Run for each device within the measurement
+    for (j = 0; j < stored_devices; j++){  
       if (devices2run[j]){  //check to see if device is to be run
         address = 20 * j +4;   //Get ROM code from EEPROM
         for (k = 0; k < 8; k++){
-          rom[k] = eeprom.EEPROM_read(address +k);
+          rom[k] = eeprom.EEPROM_read(address + k);
         } 
-            
-        //Match ROM followed by Write 3 bytes to ScratchPad
+        address += 8;
+        for (k = 0; k < 12; k++){  //Get description
+          description[k] = eeprom.EEPROM_read(address + k);
+        }
+                     
+        //Match ROM followed by read Scratchpad for resolution and alarm temperatures
         if (ds18b20.initialize()){
           Serial.println("Initialization Failure on Matcch ROM");
         }
         else{
-          //Match ROM followed by Write Scratchpad with resolution
           ds18b20.match_rom(rom); 
-          alarm_and_config[2] = res_byte; 
-          ds18b20.write_scratchpad(alarm_and_config); 
-         
-          //Match ROM followed by Convert T
+          //Read scratchpad and check CRC
+          ds18b20.read_scratchpad(scratchpad); 
+          if (ds18b20.calculateCRC_byte(scratchpad, 9)){
+            Serial.println("Scratchpad failed CRC");
+          }
+          else{
+            //Retreive high temperature alarm
+            if (scratchpad[2] > 127){
+              high_alarm = float(scratchpad[2] - 256) * 1.8 + 32.0;  //convert to deg F
+            }
+            else{
+              high_alarm = float(scratchpad[2]) * 1.8 + 32.0;  //convert to deg F
+            }
+            //Retreive low temperature alarm
+            if (scratchpad[3] > 127){
+              low_alarm = float(scratchpad[3] - 256) * 1.8 + 32.0;  //convert to deg F
+            }
+            else{
+              low_alarm = float(scratchpad[3]) * 1.8 + 32.0;  //convert to deg F
+            }
+            //Retreive low temperature alarm            
+            resolution = scratchpad[4];
+            resolution = (resolution >> 5) + 9;
+          }
+          
+          //Match ROM followed by Convert T if Initialization Passes
           if (ds18b20.initialize()){
             Serial.println("Initialization Failure on Convert Temperature");
           }
           else{
-            //Print Out Measurement Number
-            Serial.print("  Device Number: ");
-            Serial.print(j + 1);
-            
+            //Print Device Description
+            spaces = 14;
+            Serial.print("  ");
+            for (int k = 0; (k < 12 && description[k] != 255); k++){
+              Serial.print(char(description[k]));
+              spaces--;
+            }
+            //Print spaces after description
+            for (k= 0; k < spaces; k++){
+              Serial.print(" ");
+            }
+                        
             //Match ROM followed by Convert T
             if (ds18b20.initialize()) init_failures++; 
             ds18b20.match_rom(rom);
@@ -235,15 +311,27 @@ void read_temperature(int stored_devices){
             //Calculate Temperature and Print Results
             temp_c = (256 * scratchpad[1] + scratchpad[0]);
             if (scratchpad[1] > 127){  //Temperature below zero
-              temp_c -= 4096;          //calculates 2's complement
+              temp_c -= 65536;          //calculates 2's complement
             }
             temp_c /= 16.0;
             temp_f = 1.8 * temp_c + 32.0;
             averages[j] += temp_f;
             
-            Serial.print("\tTemperature: ");
+            Serial.print("  Temp.: ");
             Serial.print(temp_f);
-            Serial.println(" degF");
+            Serial.print(" deg F");
+            if (display_scratchpad){
+              Serial.print("  Upper: ");
+              Serial.print(high_alarm);
+              Serial.print(" deg F  Lower: ");
+              Serial.print(low_alarm);
+              Serial.print(" deg F  Res.: ");
+              Serial.print(resolution);
+              Serial.println(" bits");
+            }
+            else{
+              Serial.println("");
+            }
           } 
         }
       }
@@ -252,26 +340,38 @@ void read_temperature(int stored_devices){
       delay(delay_between_measurements); 
     }
   }
+  Serial.println("");  
+  
   //Finish up. Print some results
   //Print Averages Temperatures
-  Serial.println("");
-  for (i = 0; i < stored_devices; i++){
-    if (devices2run[i]){
-      Serial.print("Average for Device Number ");
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.print(averages[i] / measurements);
-      Serial.println(" degF");      
+  if (measurements > 1){
+    for (i = 0; i < stored_devices; i++){
+      Serial.print("Average for Device - ");
+  
+      if (devices2run[i]){
+        spaces = 14;
+        address = 20 * i + 12;
+        character = 0;
+        for (int j = 0; (j < 12 && character != 255); j++){
+          character = eeprom.EEPROM_read(address +j);
+          if (character != 255){
+            Serial.print(char(character));
+            spaces--;
+          }
+        }
+        Serial.print(":");
+        for (k = 0; k < spaces; k++) Serial.print(" ");
+        Serial.print(averages[i] / measurements);
+        Serial.println(" deg F");      
+      }
     }
+    Serial.println("");
   }
-  Serial.print("\nParasitic Operation? ");
+  Serial.print("Parasitic Operation? ");
   if (parasitic) Serial.println("Yes");
   else Serial.println("No");
-  Serial.print("Resolution: ");
-  Serial.print(resolution);
-  Serial.println(" bits.");
   Serial.print("Number of measurements: ");
-  Serial.println(measurements * number_of_devices_to_run);
+  Serial.println(measurements);
   Serial.print("Delay Between Measurements, ms.: ");
   Serial.println(delay_between_measurements);  
   Serial.print("Number of initialization failures: ");

@@ -23,3 +23,9 @@ Status:
 
   June 19, 2014:
   *  Parasitic operation added
+
+  June 21, 2014
+  *  Changed Find_New_Device to ask for upper and lower alarm temperature and resolution.  Stores these values
+  in the devices EEPROM.
+  *  Rewrote Edit_Description now as Edit_Stored_Information to not only allow user to change a devices's
+  description, but also to change the upper and lower alarm temperature and resolution.

@@ -97,10 +97,15 @@ long TERM_INPUT::termInt(){
   long returningInt; 
   boolean good_number;
   int inChar;
+	boolean negative;
+  boolean firstchar;	
+
 
   do { 
     good_number = true;
     returningInt = 0;
+		negative = false;
+		firstchar = false;
     
     do {
       while (!Serial.available() > 0);  //wait for monitor
@@ -111,6 +116,15 @@ long TERM_INPUT::termInt(){
         returningInt *= 10;
         returningInt += (inChar - 48);    
       }
+      else if (inChar == 45){ 	//minus sign
+        if (!firstchar){
+          negative = true;
+          firstchar = true;
+        }
+        else{
+          good_number = false;
+        }
+      }			
       else{
         good_number = false;
       }
@@ -122,7 +136,9 @@ long TERM_INPUT::termInt(){
     }
     
   }while (!good_number);
-
+  if(negative){
+		returningInt = -returningInt;
+  }
       
   return returningInt;
 }

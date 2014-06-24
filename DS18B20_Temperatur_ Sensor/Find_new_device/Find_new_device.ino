@@ -1,4 +1,4 @@
-/*  Find_new_device.ino    thepiandi@blogspot.com       MJL  061514
+/*  Find_new_device.ino    thepiandi@blogspot.com       MJL  062114
 
 1.  Uses the DS18B20 Search rom command to find the ROM code of each device that it finds on the bus.  
 2.  Once a new device is found, it's ROM code is displayed
@@ -14,10 +14,32 @@ The EEPROM_Functions library is used to read from and write to the EEPROM
 
 #include "One_wire_DS18B20.h"
 #include "EEPROM_Functions.h"
+#include "InputFromTerminal.h"
 
 DS18B20_INTERFACE ds18b20;
 EEPROM_FUNCTIONS eeprom;
+TERM_INPUT term_input;
 
+/*---------------------------------------------how_many-------------------------------------*/
+long how_many(long lower_limit, long upper_limit){
+  long menu_choice;
+  boolean good_choice;
+
+  good_choice = false;
+  do{
+    menu_choice = term_input.termInt();
+    if (menu_choice >= lower_limit && menu_choice <= upper_limit){
+      good_choice = true;
+    }
+    else{
+      Serial.println("Please Try Again");
+    }
+  }while (!good_choice);
+
+  return menu_choice; 
+}
+
+/*---------------------------------------------new_device_to_EEPROM--------------------------------*/
 void new_device_to_EEPROM(){
   int i, address;
   int stored_devices;
@@ -26,11 +48,14 @@ void new_device_to_EEPROM(){
   boolean found_new = false;
   char device_description[20];
   int no_chars_from_term;
+  int high_alarm, low_alarm, resolution;
   
   int last_device;
   byte Rom_no[8] = {0,0,0,0,0,0,0,0};
   byte New_Rom_no[8] = {0,0,0,0,0,0,0,0};
+  byte alarm_and_config[3];
   boolean proceed = true;
+  boolean parasitic;
  
    //Read number of devices
   stored_devices = eeprom.EEPROM_read(3); 
@@ -74,6 +99,10 @@ void new_device_to_EEPROM(){
             Serial.println("Device ROM failed CRC");
           }
           else{
+            /*This is where we store ROM code and description into the ATmega EEPROM and
+            we store upper and lower alarm temperatures and configuration data
+            into DS18B20's scratch pad.  Configuration data is the resolution */
+            
             //Storing the Rom Code into the next device location in EEPROM
             address = 20 * stored_devices + 4;  
             for (i = 0; i < 8; i++){
@@ -99,7 +128,66 @@ void new_device_to_EEPROM(){
             stored_devices++;
             eeprom.EEPROM_write(3, stored_devices);
             
-            //Report to user info about new device
+            //We ask user the upper and lower temperature alarms
+            Serial.print("Please enter the upper alarm temperature +257 > -67, deg F: ");
+            high_alarm = how_many(-67,257);
+            Serial.print(high_alarm);
+            Serial.println(" deg F");
+            alarm_and_config[0] = (float(high_alarm) - 32.0) / 1.8; //convert to deg C            
+            if (alarm_and_config[0] < 0){
+              alarm_and_config[0] -= 256;  //makes 2's complement
+            }
+           
+            Serial.print("Please enter the lower alarm temperature +257 > -67, deg F: ");
+            low_alarm = how_many(-67,257);
+            Serial.print(low_alarm);
+            Serial.println(" deg F");
+            alarm_and_config[1] = (float(low_alarm) - 32.0) / 1.8; //convert to deg C            
+            if (alarm_and_config[1] < 0){
+              alarm_and_config[1] -= 256;    //makes 2's complement
+            }
+            
+            //We ask user the resolution
+            Serial.print("Please resolution, 9 - 12 bits: ");
+            resolution = how_many(9, 12);
+            Serial.print(resolution);
+            Serial.println(" bits");
+            alarm_and_config[2] = 0x1F + 0x10 * 2 * (byte(resolution) - 9);  
+            
+            //Write upper alarm, lower alarm, and configuration (resolution) to scratchpad            
+            //Match ROM followed by Write 3 bytes to ScratchPad
+            if (ds18b20.initialize()){
+              Serial.println("Initialization Failure on Match ROM");
+            }
+            else{
+              //Match ROM followed by Write Scratchpad with resolution and alarms
+              ds18b20.match_rom(New_Rom_no); 
+              ds18b20.write_scratchpad(alarm_and_config); 
+            }
+            
+            //In prepation for writing scratchpad to DS18B20's EEPROM
+            //will fimd out if it connected using parasitic power
+            if (ds18b20.initialize()){
+              Serial.println("Initialization Failure");
+            }
+            else{
+              ds18b20.match_rom(New_Rom_no); 
+              parasitic = false;
+              if (!ds18b20.read_power_supply()){  //A zero means parasitic
+                parasitic = true;
+              }
+            }
+            
+            //Now we copy the scrathpad to the DS18B20's EEPROM
+            if (ds18b20.initialize()){
+              Serial.println("Initialization Failure");
+            }
+            else{
+              ds18b20.match_rom(New_Rom_no); 
+              ds18b20.copy_scratchpad(parasitic);
+            }
+            
+            //Report to user info about the new device
             Serial.print("\tThe new device is device number: ");
             Serial.println(stored_devices);
             Serial.print("\tIt's ROM code is: ");
@@ -112,7 +200,23 @@ void new_device_to_EEPROM(){
             for (i = 0; i < no_chars_from_term; i++){
               Serial.print(device_description[i]);
             }
-            Serial.println("\n"); 
+            Serial.println("");
+            
+            Serial.print("\tUpper alarm set to: ");
+            Serial.print(high_alarm);
+            Serial.print(" deg F   Lower alarm set to: ");
+            Serial.print(low_alarm);
+            Serial.println(" deg F");
+            Serial.print("\tResolution: ");
+            Serial.print(resolution);
+            Serial.println(" bits");
+            
+            if (parasitic){
+              Serial.println("\tDevice is connected using parasitic power\n");
+            }
+            else{
+              Serial.println("\tDevice is NOT connected using parasitic power\n");             
+            }
           }   
         }
       }  
