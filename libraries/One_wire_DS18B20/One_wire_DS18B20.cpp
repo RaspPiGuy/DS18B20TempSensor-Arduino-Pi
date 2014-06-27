@@ -104,12 +104,16 @@ byte DS18B20_INTERFACE::read_byte(){
   }  
   return dataword;  
 }
-//-------------------------------search_rom()-----------------------------
+//-------------------------------search_device()-----------------------------
 
-/* This  function runs the basic algorithm as
-outlined in Maxim's Application Note 187, "1-Wire Search Algorithm".  
-Function finds one device and stores it's code in the array New_Rom_no.
-It returns the variable LastDescrepanvy.  
+/* 
+Function called by search_rom() and alarm_search(). This does the actual work 
+required of these functions.  The only difference between search_rom() and 
+alarm_search() is they pass different command codes, or what Maxim calls protocol.
+ 
+This  function runs the basic algorithm as outlined in Maxim's Application 
+Note 187, "1-Wire Search Algorithm".  Function finds one device and stores 
+it's code in the array New_Rom_no. It returns the variable LastDescrepanvy.  
 
 The function is passed the array Rom_no and the variable LastDiscrepancy.  
 If this is the first time the function is run, Rom_no will contain eight 
@@ -119,7 +123,7 @@ function finds the last device connected to 1-wire, LastDiscrepancy will be
 zero.  The ROM code of the newly discovered device goes into the array New_Rom_no.  
 */
 
-int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy){
+int DS18B20_INTERFACE::search_device(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy, byte code){
   int Rom_byte_mask;
   int Rom_bit_mask;
   boolean LastDeviceFound = false;
@@ -132,7 +136,7 @@ int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDisc
   Rom_bit_mask = 0;   //To access correct bit in Rom_no
   last_zero = 0;
   bit_number = 1;
-  write_byte(0xF0);  //send code for search command
+  write_byte(code);  //send code for search command
   
   do {                       //Do Until All 64 Bits Are Accessed
     id_bit = master_read(); 
@@ -281,6 +285,29 @@ void DS18B20_INTERFACE::match_rom(byte rom_value[]){
     write_byte(rom_value[i]);
   }
 }
+
+//--------------------------search_rom()-----------------------------------------
+/*  ROM command called by user.  Preceded by initialize().
+
+Real work of this function is done by search_device.
+*/
+
+int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy){
+	LastDiscrepancy = search_device(Rom_no, New_Rom_no, LastDiscrepancy, 0xF0);
+	return LastDiscrepancy;
+}
+
+//--------------------------alarm_search()---------------------------------------
+/* ROM command called by user.  Preceded by initialize().  
+
+Real work of this function is done by search_device.
+*/
+
+int DS18B20_INTERFACE::alarm_search(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy){
+	LastDiscrepancy = search_device(Rom_no, New_Rom_no, LastDiscrepancy, 0xEC);
+	return LastDiscrepancy;
+}
+
 /*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Function Commands >>>>>>>>>>>>>>>>>>>>>>>>*/
 
 //-------------------------convert_t()------------------------------------------

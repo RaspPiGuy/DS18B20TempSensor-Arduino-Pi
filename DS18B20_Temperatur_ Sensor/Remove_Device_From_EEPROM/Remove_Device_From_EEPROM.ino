@@ -33,7 +33,7 @@ int find_stored_devices(){
     for (int i = 0; i < stored_devices; i++){
       Serial.print("Device No: ");
       Serial.print(i + 1);
-      Serial.print("  Descriptiom: ");
+      Serial.print("  Description: ");
    
       character = 0;
       for (int j = 0; (j < 12 && character != 255); j++){
@@ -96,44 +96,51 @@ void remove_from_EEPROM(int stored_devices){
   int i, j;
   
   //Interfce with user. Keep in loop until user is satisfied with choice
-  do{
-    Serial.print("Which Device To Remove? ");
-    which_device = how_many(1, stored_devices);
-    Serial.println(which_device);
-    
-    Serial.println("\nOK To Remove Device? ");
-    make_run = yes_or_no();
-    if (!make_run){
-      Serial.println("");
-    }   
-  }while (!make_run);
-  Serial.println("");
- 
-  //Find address of first byte to be overwritten, and address of first byte to be moved
-  address = 20 * which_device - 16;
-  //Calculate number of bytes to moce
-  bytes_to_move = 20 * (stored_devices - which_device) + 20;
-  //Loop to read byte 20 positions away and write to byte to be wirtten over 
-  for (i = 0; i < bytes_to_move; i++){
-      character = eeprom.EEPROM_read(address + 20 +i);
-      eeprom.EEPROM_write((address + i), character);
+  
+  Serial.print("Which Device To Remove? ");
+  which_device = how_many(1, stored_devices);
+  Serial.println(which_device);
+  
+  Serial.println("\nOK To Remove Device? ");
+//  make_run = yes_or_no();
+  if (yes_or_no()){
+    Serial.println("");  
+    //Find address of first byte to be overwritten, and address of first byte to be moved
+    address = 20 * which_device - 16;
+    //Calculate number of bytes to moce
+    bytes_to_move = 20 * (stored_devices - which_device) + 20;
+    //Loop to read byte 20 positions away and write to byte to be wirtten over 
+    for (i = 0; i < bytes_to_move; i++){
+        character = eeprom.EEPROM_read(address + 20 +i);
+        eeprom.EEPROM_write((address + i), character);
+    }
+    //Reduce the number of devices in EEPROM address 3 (the number of stored devices)
+    eeprom.EEPROM_write(3, (stored_devices - 1));
+    // Say operation is complete
+    Serial.println("Operation complete");  
   }
-  //Reduce the number of devices in EEPROM address 3 (the number of stored devices)
-  eeprom.EEPROM_write(3, (stored_devices - 1));
-  // Say operation is complete
-  Serial.println("Operation complete");  
 }
 
 /*---------------------------------------------setup-------------------------------------*/
 void setup() {
+  boolean done = false;
   Serial.begin(9600);
-  int stored_devices = find_stored_devices();
-  if (stored_devices){
-    remove_from_EEPROM(stored_devices);
-  }
+  
+  do{
+    int stored_devices = find_stored_devices();
+    if (stored_devices){
+      remove_from_EEPROM(stored_devices);
+    }
+    Serial.println("\nFinished?");
+    done = yes_or_no();
+    if (!done){
+      Serial.println("");
+    }
+  }while(!done);
+  Serial.println("\nDone"); 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+
 
 }

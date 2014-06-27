@@ -13,3 +13,7 @@ master_write1	KEYWORD2
 write_byte	KEYWORD2
 master_read	KEYWORD2
 read_byte	KEYWORD2
+copy_scratchpad	KEYWORD2
+recall_eeprom	KEYWORD2
+read_power_supply	KEYWORD2
+alarm_search	KEYWORD2

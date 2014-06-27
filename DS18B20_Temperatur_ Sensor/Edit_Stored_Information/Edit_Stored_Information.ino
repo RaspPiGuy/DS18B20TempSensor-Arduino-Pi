@@ -54,10 +54,16 @@ int find_stored_devices(){
         Serial.println("Initialization Failure");
       }
       else{
-        address = 20 * i + 4;   //Get ROM code from EEPROM
+        Serial.print("\tROM Code: ");
+        address = 20 * i + 4;   //Get ROM code from EEPROM and Print it out
         for (int k = 0; k < 8; k++){   
           rom[k] = eeprom.EEPROM_read(address +k);
+          Serial.print(rom[k], HEX);
+          Serial.print(" ");
         } 
+        Serial.println("");
+        
+        
         ds18b20.match_rom(rom);
         //Read scratchpad and check CRC
         ds18b20.read_scratchpad(scratchpad); 

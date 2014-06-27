@@ -249,7 +249,7 @@ void read_temperature(int stored_devices){
                      
         //Match ROM followed by read Scratchpad for resolution and alarm temperatures
         if (ds18b20.initialize()){
-          Serial.println("Initialization Failure on Matcch ROM");
+          Serial.println("Initialization Failure on Match ROM");
         }
         else{
           ds18b20.match_rom(rom); 
