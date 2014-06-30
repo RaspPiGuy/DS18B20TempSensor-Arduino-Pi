@@ -1,4 +1,4 @@
-/*  Read_Temperatures.ino    thepiandi@blogspot.com       MJL  062114
+/*  Read_Temperatures.ino    thepiandi@blogspot.com       MJL  062914
 
 Everything but the kitchen sink program to read temperatures from the DS18B20 device.  Program:
 1.    Displays the description and device number of all the devices in EEPROM
@@ -8,15 +8,15 @@ Everything but the kitchen sink program to read temperatures from the DS18B20 de
 4.    Asks what the delay berween measurements is to be.  Asks hours, minutes, seconds, milliseconds
 5.    Asks how many bits of resolution 9 - 12 possible
 6.    Asks if it OK to run.  If not, program returns to step 2. above.
-7.    Asks if to run parasitic power.
+7.    Determines if any device is connected using parasitic power.
 
-8.    Runs two loops, one for each measurement, and the inner loop, one for each device to be run.
+8.    Runs two loops, outer loop for each measurement, and the inner loop, for each device to be run.
 9.    For each measurement retrieves ROM code from EEPROM and runs the following DS18B20 commands:
-9.a.    Initialize, match rom, write scratchpad with resolution (alarm limits set to max and min).
-9.b.    Initialize, match rom, convert t, read scratchpad, CRC on scratchpad.
-10.    Temperature is calculated from scratch pad and displayed in deg F.
+9.    Initialize, match rom, convert t, read scratchpad, CRC on scratchpad.
+10.   Temperature is calculated from scratch pad and displayed in deg F.
+11.   If user wishes, the upper and lower temperature limits and resolution are displayed
 11.   When the run is completed, the average is displayed for each device run.
-12.   Other parameters and diagnostic information are displayed.
+12.   Other parameters and diagnostic information is displayed.
 
 Uses the One_wire_DS18B20 library functions for basic one wire operation.
 The EEPROM_Functions library is used to read the device's ROM code and description from EEPROM.
@@ -230,12 +230,13 @@ void read_temperature(int stored_devices){
   }while (!make_run);
   Serial.println("");
    
-  //Main measurement loop
+  //Outer measurement loop
   //Run for each measurement
   for (i = 0; i < measurements; i++){  
     Serial.print("Measurement: ");
     Serial.println(i + 1);
-    //Run for each device within the measurement
+    //Inner Loop
+    //Run for each device
     for (j = 0; j < stored_devices; j++){  
       if (devices2run[j]){  //check to see if device is to be run
         address = 20 * j +4;   //Get ROM code from EEPROM
@@ -257,6 +258,7 @@ void read_temperature(int stored_devices){
           ds18b20.read_scratchpad(scratchpad); 
           if (ds18b20.calculateCRC_byte(scratchpad, 9)){
             Serial.println("Scratchpad failed CRC");
+            crc_errors++;
           }
           else{
             //Retreive high temperature alarm
