@@ -8,10 +8,10 @@ Incremental Project to use Maxim/Dallas DS18B20 Temperature Sensors
 Goals:
 * Write my own 1-wire library including all 1-wire functions
 * Use ATmega328P to interface to as many as 50 devices
-* Store ROM code and up to 12 chgaracters in ATmega's EEPROM (reason for limit of 50 devices)
+* Store ROM code and up to 12 characters in ATmega's EEPROM (reason for limit of 50 devices)
 * Use Raspbery Pi to control functionality of ATmega.
-* ATmega device to be pullled from Arduino and installed on PCB and in an enclosure
-* Enclosure will also contail batteries, couple of switches, and 2 line by 16 character LCD display
+* ATmega device to be pulled from Arduino and installed on PCB and in an enclosure
+* Enclosure will also contain batteries, couple of switches, and 2 line by 16 character LCD display
 * ATmega and Raspberry Pi to communicate with each other by undetermined means - probably RF
 
 Status:
@@ -27,5 +27,32 @@ Status:
   June 21, 2014
   *  Changed Find_New_Device to ask for upper and lower alarm temperature and resolution.  Stores these values
   in the devices EEPROM.
-  *  Rewrote Edit_Description now as Edit_Stored_Information to not only allow user to change a devices's
+  *  Rewrote Edit_Description now as Edit_Stored_Information to not only allow user to change a device's
   description, but also to change the upper and lower alarm temperature and resolution.
+	
+	July 2, 2014
+	*  In the library .h and ,cpp files, all ROM Commands as well as all DS18B20 Functions Commands are implemented 
+	per the Maxim/Dallas data sheet.
+	*  Library files to handle storing and retrieving device ROM codes and descriptions are implemented.
+	*  Library functions to handle imputing numbers in floating point and integer formats are implemented.
+	*  All Arduino application sketches for the DS18B20 are complete.  These include the following sketches:
+				> Find_New_Device - Scans the 1-wire bus to see if any device has been added.  If so asks user
+				for a description which is stored in ATmega EEPROM along with the ROM code.  Asks user to input upper and 
+				lower temperature limits and resolution.  These are stored within the device's scratchpad and the 
+				device's EEPROM.
+				> Read_Temperature - Asks user what devices to run, number of measurements, and time between measurements.
+				Function determines if devices are connected using parasitic power.  Measurements are made accordingly.
+				User has to option to print out the temperature limits as well as the resolution along with the 
+				temperature.  Once the run is made, displays the average of all measurements for each device.
+				>  Scan_for_Alarms - Scans the 1-wire bus to see if any device's temperature is out of limits.  If so
+				displays that information to the user.  Must determine if device is connected using parasitic power.
+				>  Devices_in_EEPROM - Displays the ROM code and description for each device as stored in the ATmega
+				EEPROM.
+				>  Devices_On_The_Bus - Scans the 1-wire bus and reports ROM code and CRC results.  
+				>  Edit_Stored_Information - Reports to user ROM code, description, upper and lower temperature limits and
+				resolution.  Asks user which device to change and what to change.  Changes are made accordingly and stored.
+				>  Remove_Device_From_EEPROM - Allows user to remove ROM code and description for any device.  This does
+				not remove information from the device's scratchpad or the device's EEPROM.
+		
+				
+
