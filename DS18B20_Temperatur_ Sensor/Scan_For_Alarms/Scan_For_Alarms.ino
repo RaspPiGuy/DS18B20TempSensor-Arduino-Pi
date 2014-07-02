@@ -1,4 +1,4 @@
-/*  Scan_For_Alarm.ino  thepiandi@blogspot.com      MJL  062714
+/*  Scan_For_Alarm.ino  thepiandi@blogspot.com      MJL  070214
 
 1.  Uses the DS18B20 Alarm Search command to find the ROM code of each device whose 
 temperature is higher than the upper temperature limit or lower that the lower 
@@ -38,7 +38,6 @@ void alarms(){
   
   int last_device;
   byte Rom_no[8] = {0,0,0,0,0,0,0,0};
-  byte New_Rom_no[8] = {0,0,0,0,0,0,0,0};
   byte alarm_and_config[3];
   boolean proceed = true;
   boolean parasitic = false;
@@ -75,7 +74,7 @@ void alarms(){
     ds18b20.convert_t(parasitic_all_devices, 12);
 
     //Do until the last device with an alarm flag set is found by alarm_search().
-    //If no device has its alarm flag set, New_Rom_no[] will return as 00000000.
+    //If no device has its alarm flag set, Rom_no[] will return as 00000000.
     last_device = 0;
     do {
       if (ds18b20.initialize()){  //Must initialize before finding each device.
@@ -83,12 +82,12 @@ void alarms(){
         proceed = false;
       }
       if (proceed){
-        //New_Rom_no will have the ROM code for the device returned
-        last_device = ds18b20.alarm_search(Rom_no, New_Rom_no, last_device);
+        //Rom_no will have the ROM code for the device returned
+        last_device = ds18b20.alarm_search(Rom_no, last_device);
 
         Serial.println("");
         //Test to see if there are no device that has its alarm flag set
-        if (New_Rom_no[0] == 0){
+        if (Rom_no[0] == 0){
           Serial.println("All Devices Are Within Set Temperature Limits");
           proceed = false;
         }
@@ -100,14 +99,14 @@ void alarms(){
         //to possibly find another device woth an alarm flag set
     
         //Now that we know that a device has its alarm flag set, we will use the ROM
-        //code found in New_Rom_no[] to search the ATmega EEPROM to find the device's 
+        //code found in Rom_no[] to search the ATmega EEPROM to find the device's 
         //description. We will search the device's scratchpad for the temperature limits
         //and its resolution. 
         //Next we will do a temperature measurement of the device and print out
         //this measurement along with the temperature upper and lower limit and resolution.
         
         //We'll do a CRC check on the ROM code
-        if (ds18b20.calculateCRC_byte(New_Rom_no, 8)){
+        if (ds18b20.calculateCRC_byte(Rom_no, 8)){
           Serial.println("Device ROM failed CRC");
           proceed = false;
         }        
@@ -119,10 +118,10 @@ void alarms(){
           for (loop_device = 0; (loop_device != stored_devices && !match); loop_device++){
             address = 20 * loop_device + 4;  //jump to first byte of device in EEPROM
             match = true;
-            //loop for each byte.  Compares byte in EEPROM with byte in New_Rom_no.
+            //loop for each byte.  Compares byte in EEPROM with byte in Rom_no.
             //Exits if a byte does not match. and makes match false. 
             for (loop_bytes = 0; (loop_bytes < 8 && match); loop_bytes++){
-              if (New_Rom_no[loop_bytes] != eeprom.EEPROM_read(address)){
+              if (Rom_no[loop_bytes] != eeprom.EEPROM_read(address)){
                 match = false;  // A byte does not match try the next device
               }
               address++;  //get next byte
@@ -152,7 +151,7 @@ void alarms(){
             proceed = false;
           }
           if (proceed){
-            ds18b20.match_rom(New_Rom_no); 
+            ds18b20.match_rom(Rom_no); 
             if (!ds18b20.read_power_supply()){  //A zero means parasitic
               parasitic = true;
               Serial.println("\nDevice is connected using parasitic power");
@@ -171,7 +170,7 @@ void alarms(){
         }
       }
       if (proceed){
-        ds18b20.match_rom(New_Rom_no); 
+        ds18b20.match_rom(Rom_no); 
         //Read scratchpad and check CRC
         ds18b20.read_scratchpad(scratchpad); 
         if (ds18b20.calculateCRC_byte(scratchpad, 9)){
@@ -206,7 +205,7 @@ void alarms(){
       }
       //Do convert_t on device
       if (proceed){
-        ds18b20.match_rom(New_Rom_no);
+        ds18b20.match_rom(Rom_no);
         ds18b20.convert_t(parasitic, resolution);
         
         //Match ROM followed by Read Scratchpad
@@ -216,7 +215,7 @@ void alarms(){
         }
       }   
       if (proceed){
-        ds18b20.match_rom(New_Rom_no);
+        ds18b20.match_rom(Rom_no);
         ds18b20.read_scratchpad(scratchpad);
                   
         //Check scratchpad CRC
@@ -247,12 +246,6 @@ void alarms(){
         Serial.print(resolution);
         Serial.println(" bits");
   
-        //Final operation is to copy New_Rom_no to Rom_no and zero New_Rom_no to
-        //prepare for next alarm scan
-        for (i = 0; i < 8; i++){
-          Rom_no[i] = New_Rom_no[i];
-          New_Rom_no[i] = 0;
-        }
       }    
     }while (last_device && proceed);
   }

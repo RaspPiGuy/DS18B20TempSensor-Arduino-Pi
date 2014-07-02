@@ -66,8 +66,8 @@ class DS18B20_INTERFACE{
     void read_scratchpad(byte scratchpad_value[]);
     int convert_t(boolean parasitic, int resolution);
     void write_scratchpad(byte alarm_and_configuration[]);
-    int search_rom(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy);
-    int alarm_search(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy);
+    int search_rom(byte Rom_no[], int LastDiscrepancy);
+    int alarm_search(byte Rom_no[], int LastDiscrepancy);
 		void copy_scratchpad(boolean parasitic);
 		int recall_eeprom();
 		boolean read_power_supply();
@@ -77,7 +77,7 @@ class DS18B20_INTERFACE{
     void write_byte(byte dataword);
     byte master_read();
     byte read_byte();
-    int search_device(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy, byte code);
+    int search_device(byte Rom_no[], int LastDiscrepancy, byte code);
 
 };
 

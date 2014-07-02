@@ -112,18 +112,27 @@ required of these functions.  The only difference between search_rom() and
 alarm_search() is they pass different command codes, or what Maxim calls protocol.
  
 This  function runs the basic algorithm as outlined in Maxim's Application 
-Note 187, "1-Wire Search Algorithm".  Function finds one device and stores 
-it's code in the array New_Rom_no. It returns the variable LastDescrepanvy.  
+Note 187, "1-Wire Search Algorithm".  The variable names, as much as possible
+are the same as found in the application note. Function finds one device and stores 
+it's code in the array Rom_no. It returns the variable LastDescrepanvy.  
 
-The function is passed the array Rom_no and the variable LastDiscrepancy.  
-If this is the first time the function is run, Rom_no will contain eight 
-zeros and LastDiscrepancy will be 0.  If this function finds a device, it
-is called again with the last values of Rom_no and LastDiscrepancy.  If the
-function finds the last device connected to 1-wire, LastDiscrepancy will be
-zero.  The ROM code of the newly discovered device goes into the array New_Rom_no.  
+If this function is called from search_rom(), the application script will call 
+this function once for each device on the bus.  If called from alarm_search(),
+the application script will call this function once for each device whose 
+temperature is out of tolerance.  However, it will be called at least once.
+
+The eight byte array, Rom_no[] will contain the ROM code of the device that was 
+found by the scan. The same Rom_no[] is passed into the function when it is called 
+by the application code. The other variable, LastDiscrepancy is passed recursively 
+into the function and is returned by the function when it exits. When LastDiscrepancy 
+returns a zero to the application script, it signals the script that no other devices 
+will be found.
+ 
+The first time the function is run, Rom_no must be set to eight zeros and LastDiscrepancy 
+to 0.  
 */
 
-int DS18B20_INTERFACE::search_device(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy, byte code){
+int DS18B20_INTERFACE::search_device(byte Rom_no[], int LastDiscrepancy, byte code){
   int Rom_byte_mask;
   int Rom_bit_mask;
   boolean LastDeviceFound = false;
@@ -172,11 +181,14 @@ int DS18B20_INTERFACE::search_device(byte Rom_no[], byte New_Rom_no[], int LastD
     }
 		//Now write that same bit into ROM ID at the present byte and bit position
     if (search_direction){        
-      New_Rom_no[Rom_byte_mask] |= (1 << Rom_bit_mask);   //Set bit to 1
+      Rom_no[Rom_byte_mask] |= (1 << Rom_bit_mask);   //Set bit to 1
     }
-     
+		else{
+			Rom_no[Rom_byte_mask] &= (255 - (1 << Rom_bit_mask));   //Set bit to 0
+	  }
+    
     Rom_bit_mask++;      //Shift to the next bit position in the ROM ID
-		//If we have gone beyond the byte boundry, move to the next byte
+		//If we have gone beyond the byte boundary, move to the next byte
     if (Rom_bit_mask > 7){  
       Rom_byte_mask++;
       Rom_bit_mask = 0;      
@@ -292,8 +304,8 @@ void DS18B20_INTERFACE::match_rom(byte rom_value[]){
 Real work of this function is done by search_device.
 */
 
-int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy){
-	LastDiscrepancy = search_device(Rom_no, New_Rom_no, LastDiscrepancy, 0xF0);
+int DS18B20_INTERFACE::search_rom(byte Rom_no[], int LastDiscrepancy){
+	LastDiscrepancy = search_device(Rom_no, LastDiscrepancy, 0xF0);
 	return LastDiscrepancy;
 }
 
@@ -303,8 +315,8 @@ int DS18B20_INTERFACE::search_rom(byte Rom_no[], byte New_Rom_no[], int LastDisc
 Real work of this function is done by search_device.
 */
 
-int DS18B20_INTERFACE::alarm_search(byte Rom_no[], byte New_Rom_no[], int LastDiscrepancy){
-	LastDiscrepancy = search_device(Rom_no, New_Rom_no, LastDiscrepancy, 0xEC);
+int DS18B20_INTERFACE::alarm_search(byte Rom_no[], int LastDiscrepancy){
+	LastDiscrepancy = search_device(Rom_no, LastDiscrepancy, 0xEC);
 	return LastDiscrepancy;
 }
 

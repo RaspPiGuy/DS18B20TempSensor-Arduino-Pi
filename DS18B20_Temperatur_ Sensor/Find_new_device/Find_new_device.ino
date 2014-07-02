@@ -1,4 +1,4 @@
-/*  Find_new_device.ino    thepiandi@blogspot.com       MJL  062114
+/*  Find_new_device.ino    thepiandi@blogspot.com       MJL  070214
 
 1.  Uses the DS18B20 Search rom command to find the ROM code of each device that it finds on the bus.  
 2.  Once a new device is found, it's ROM code is displayed
@@ -52,7 +52,6 @@ void new_device_to_EEPROM(){
   
   int last_device;
   byte Rom_no[8] = {0,0,0,0,0,0,0,0};
-  byte New_Rom_no[8] = {0,0,0,0,0,0,0,0};
   byte alarm_and_config[3];
   boolean proceed = true;
   boolean parasitic;
@@ -67,16 +66,16 @@ void new_device_to_EEPROM(){
     //Do until the last device connected to the bus is found by search_rom().
     do {
       if (!ds18b20.initialize()){  //Must initialize before finding each device.
-        last_device = ds18b20.search_rom(Rom_no, New_Rom_no, last_device);      
+        last_device = ds18b20.search_rom(Rom_no, last_device);      
         match = false;
         //loop for each device in EEPROM. If a match is found, exit the loop
         for (loop_device = 0; (loop_device != stored_devices && !match); loop_device++){
           address = 20 * loop_device + 4;  //jump to first byte of device in EEPROM
           match = true;
-          //loop for each byte.  Compares byte in EEPROM with byte in New_Rom_no.
+          //loop for each byte.  Compares byte in EEPROM with byte in Rom_no.
           //Exits if a byte does not match. and makes match false. 
           for (loop_bytes = 0; (loop_bytes < 8 && match); loop_bytes++){
-            if (New_Rom_no[loop_bytes] != eeprom.EEPROM_read(address)){
+            if (Rom_no[loop_bytes] != eeprom.EEPROM_read(address)){
               match = false;  // A byte does not match
             }
             address++;  //get next byte
@@ -95,7 +94,7 @@ void new_device_to_EEPROM(){
           found_new = true;
           Serial.println("A new device has been found.");
           //We'll do a CRC check first
-          if (ds18b20.calculateCRC_byte(New_Rom_no, 8)){
+          if (ds18b20.calculateCRC_byte(Rom_no, 8)){
             Serial.println("Device ROM failed CRC");
           }
           else{
@@ -106,7 +105,7 @@ void new_device_to_EEPROM(){
             //Storing the Rom Code into the next device location in EEPROM
             address = 20 * stored_devices + 4;  
             for (i = 0; i < 8; i++){
-              eeprom.EEPROM_write(address, New_Rom_no[i]);
+              eeprom.EEPROM_write(address, Rom_no[i]);
               address += 1;
             }
             //Asking for a description
@@ -161,7 +160,7 @@ void new_device_to_EEPROM(){
             }
             else{
               //Match ROM followed by Write Scratchpad with resolution and alarms
-              ds18b20.match_rom(New_Rom_no); 
+              ds18b20.match_rom(Rom_no); 
               ds18b20.write_scratchpad(alarm_and_config); 
             }
             
@@ -171,7 +170,7 @@ void new_device_to_EEPROM(){
               Serial.println("Initialization Failure");
             }
             else{
-              ds18b20.match_rom(New_Rom_no); 
+              ds18b20.match_rom(Rom_no); 
               parasitic = false;
               if (!ds18b20.read_power_supply()){  //A zero means parasitic
                 parasitic = true;
@@ -183,7 +182,7 @@ void new_device_to_EEPROM(){
               Serial.println("Initialization Failure");
             }
             else{
-              ds18b20.match_rom(New_Rom_no); 
+              ds18b20.match_rom(Rom_no); 
               ds18b20.copy_scratchpad(parasitic);
             }
             
@@ -192,7 +191,7 @@ void new_device_to_EEPROM(){
             Serial.println(stored_devices);
             Serial.print("\tIt's ROM code is: ");
             for (int i = 0; i < 8; i++){
-              Serial.print(New_Rom_no[i], HEX);
+              Serial.print(Rom_no[i], HEX);
               Serial.print(" ");
             }
             Serial.println("");
@@ -220,11 +219,6 @@ void new_device_to_EEPROM(){
           }   
         }
       }  
-      //The just found ROM code is copied to Rom_no which is passed to search rom
-      for (i = 0; i < 8; i++){
-        Rom_no[i] = New_Rom_no[i];
-        New_Rom_no[i] = 0;
-      }
     //search_rom() will return last_device as 0 when last device on bus has been found
     }while (last_device && proceed); 
     if(!found_new){
