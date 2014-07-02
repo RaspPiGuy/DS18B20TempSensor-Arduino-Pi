@@ -5,7 +5,7 @@ functionality of the 1-wire interface and the device itself.
 
 http://datasheets.maximintegrated.com/en/ds/DS18B20.pdf
  
-MJL - thepiandi.blogspot.com  05/09/14
+MJL - thepiandi.blogspot.com  07/02/14
 */
 
 #ifndef DS18B20_INTERFACE_H

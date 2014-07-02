@@ -14,7 +14,7 @@ Programming"
 
 http://thepiandi.blogspot.com/2014/01/gertboard-programming-with-atmega.html
 
-MJL - thepiandi.blogspot.com  05/09/14
+MJL - thepiandi.blogspot.com  07/02/14
 */
 
 #include "One_wire_DS18B20.h"
