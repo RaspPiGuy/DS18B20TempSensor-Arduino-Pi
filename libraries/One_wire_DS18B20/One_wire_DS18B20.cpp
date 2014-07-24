@@ -32,10 +32,10 @@ and then releasing it (make data pin an input). An additional 7usec. makes
 this operation one time slot long. */
  
 void DS18B20_INTERFACE::master_write0(){  
-  PORT &= !(1 << PORT_PIN);  //Data pin = 0    
+  PORT &= ~(1 << PORT_PIN);  //Data pin = 0    
   DDR |= (1 << PORT_PIN);  //Data pin is OUTPUT  
   delayMicroseconds(60 / CLOCK_FACTOR);  
-  DDR &= !(1 << PORT_PIN);  //Data pin is INPUT  
+  DDR &= ~(1 << PORT_PIN);  //Data pin is INPUT  
   delayMicroseconds(7 / CLOCK_FACTOR);  
 }
 
@@ -46,10 +46,10 @@ and then releasing it (make data pin an input). An additional 54usec. makes
 this operation one time slot long. */
 
 void DS18B20_INTERFACE::master_write1(){  
-  PORT &= !(1 << PORT_PIN);  //Data pin = 0     
+  PORT &= ~(1 << PORT_PIN);  //Data pin = 0     
   DDR |= (1 << PORT_PIN);  //Data pin is OURPUT  
   delayMicroseconds(13 / CLOCK_FACTOR);  
-  DDR &= !(1 << PORT_PIN);  //Data pin is INPUT 
+  DDR &= ~(1 << PORT_PIN);  //Data pin is INPUT 
   delayMicroseconds(54 / CLOCK_FACTOR);   
 }  
 //-------------------------write_byte()-----------------------------------------
@@ -79,10 +79,10 @@ for 50usec. more. */
   
 byte DS18B20_INTERFACE::master_read(){  
   byte ret_val;  
-  PORT &= !(1 << PORT_PIN);  //Datapin = 0    
+  PORT &= ~(1 << PORT_PIN);  //Datapin = 0    
   DDR |= (1 << PORT_PIN);  //Datapin is OUTPUT    
   delayMicroseconds(5 / CLOCK_FACTOR); 
-  DDR &= !(1 << PORT_PIN);  //Datapin is INPUT  
+  DDR &= ~(1 << PORT_PIN);  //Datapin is INPUT  
   delayMicroseconds(6 / CLOCK_FACTOR);   
   ret_val = PIN & DATAMASK; //Read input register and mask for your pin  
   delayMicroseconds(50 / CLOCK_FACTOR);  
@@ -184,7 +184,7 @@ int DS18B20_INTERFACE::search_device(byte Rom_no[], int LastDiscrepancy, byte co
       Rom_no[Rom_byte_mask] |= (1 << Rom_bit_mask);   //Set bit to 1
     }
 		else{
-			Rom_no[Rom_byte_mask] &= (255 - (1 << Rom_bit_mask));   //Set bit to 0
+			Rom_no[Rom_byte_mask] &= ~(1 << Rom_bit_mask);   //Set bit to 0
 	  }
     
     Rom_bit_mask++;      //Shift to the next bit position in the ROM ID
@@ -243,10 +243,10 @@ programmed to take 1ms. */
 boolean DS18B20_INTERFACE::initialize(){
   boolean failure = false;  
   int ret_val;  
-  PORT &= !(1 << PORT_PIN);  //Data pin = 0    
+  PORT &= ~(1 << PORT_PIN);  //Data pin = 0    
   DDR |= (1 << PORT_PIN);  //Data pin is OUTPUT  
   delayMicroseconds(500 / CLOCK_FACTOR);  
-  DDR &= !(1 << PORT_PIN);  //Data pin is INPUT  
+  DDR &= ~(1 << PORT_PIN);  //Data pin is INPUT  
   delayMicroseconds(75 / CLOCK_FACTOR);  //Making this 600 will cause failure.GOOD  
   ret_val = PIN & DATAMASK; //Read input register and mask for your pin
   delayMicroseconds(425 / CLOCK_FACTOR); 
@@ -349,7 +349,7 @@ does not return anything.
 int DS18B20_INTERFACE::convert_t(boolean parasitic, int resolution){
 	if (parasitic){
 		//Data pin for hard pull-up pulled low
-  	PORT_1 &= !(1 << PORT_PIN_1); 
+  	PORT_1 &= ~(1 << PORT_PIN_1); 
 		write_byte(0x44);
 		//Pin controlling hard pull-up is output turning transistor on
 		DDR_1 |= (1 << PORT_PIN_1);   
@@ -420,7 +420,7 @@ ATmega device.  This will be done in the same way as is done in the convert_t() 
 void DS18B20_INTERFACE::copy_scratchpad(boolean parasitic){
 	if (parasitic){
 		//Data pin for hard pull-up pulled low
-  	PORT_1 &= !(1 << PORT_PIN_1); 
+  	PORT_1 &= ~(1 << PORT_PIN_1); 
 		write_byte(0x48);
 		//Pin controlling hard pull-up is output turning transistor on
 		DDR_1 |= (1 << PORT_PIN_1);   

@@ -347,10 +347,9 @@ void read_temperature(int stored_devices){
   //Finish up. Print some results
   //Print Averages Temperatures
   if (measurements > 1){
-    for (i = 0; i < stored_devices; i++){
-      Serial.print("Average for Device - ");
-  
+    for (i = 0; i < stored_devices; i++){ 
       if (devices2run[i]){
+        Serial.print("Average for Device - ");
         spaces = 14;
         address = 20 * i + 12;
         character = 0;

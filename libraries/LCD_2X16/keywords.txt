@@ -1,0 +1,14 @@
+LCD_2X16	KEYWORD1
+lcd_message	KEYWORD2
+lcd_init	KEYWORD2
+clear_display	KEYWORD2
+DDRAM_address	KEYWORD2
+display_on_off	KEYWORD2
+cursor_on_off	KEYWORD2
+cursor_shift_right	KEYWORD2
+cursor_shift_left	KEYWORD2
+display_shift_right	KEYWORD2
+display_shift_left	KEYWORD2
+increment_address	KEYWORD2
+decrement_address	KEYWORD2
+s_bit	KEYWORD2	KEYWORD2

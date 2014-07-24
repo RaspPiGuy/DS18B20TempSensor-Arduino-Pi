@@ -18,8 +18,8 @@ void EEPROM_FUNCTIONS::EEPROM_write(int address, unsigned char data){
   EEDR = data;
   
   //Setup EEPM1 EEPM0 to 00
-  EECR &= !(1<<EEPM1);
-  EECR &= !(1<<EEPM0);
+  EECR &= ~(1<<EEPM1);
+  EECR &= ~(1<<EEPM0);
   
   
   //Write logical 1 to EEMPE
