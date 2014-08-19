@@ -59,3 +59,22 @@ July 2, 2014
 
 **  Remove_Device_From_EEPROM - Allows user to remove ROM code and description for any device.  This does not remove information from the device's scratchpad or the device's EEPROM.
 
+July 20, 2014
+*   Starting with python sketches, written for the Raspberry Pi, wrote a library for the 2 line by 16 character LCD display.  
+
+*   Using the LCD display library, wrote sketch "Input_to_TwoLineDisplay". User can input a text string up to 100 characters.  The text is parsed into segments such that only complete words are displayed on the 16 character LCD display.
+
+*   Using the LCD display library, wrote sketch called "Times_Square_Scroll".  User can input a text string up to 100 characters.  Text is displayed starting on the top line at the far right of the screen. Text proceeds right to left as new text is added to the right of the screen. Once the full text has been displayed, it starts over at the same position on the screen but on the other line.  This goes on indefinitely with the text alternating from line to line.
+
+*   At this time, LCD has not been incorporated into DS18B20 temperature measurements.
+
+August 19, 2014
+*   Added sketch, "DS18B20_Suite".  This combines the sketches:
+      Read_Temperature
+      Scan_for_Alarms
+      Find_New_Device
+      Devices_On_The_Bus
+      Devices_in_EEPROM
+      Edit_Stored_Information
+      Remove_Device_From_EEPROM
+into one sketch with a menu for the user to select the desired operation.

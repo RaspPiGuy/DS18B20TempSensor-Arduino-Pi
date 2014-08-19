@@ -97,27 +97,28 @@ void remove_from_EEPROM(int stored_devices){
   
   //Interfce with user. Keep in loop until user is satisfied with choice
   
-  Serial.print("Which Device To Remove? ");
-  which_device = how_many(1, stored_devices);
+  Serial.print("Which Device To Remove, 0 to Exit? ");
+  which_device = how_many(0, stored_devices);
   Serial.println(which_device);
-  
-  Serial.println("\nOK To Remove Device? ");
-//  make_run = yes_or_no();
-  if (yes_or_no()){
-    Serial.println("");  
-    //Find address of first byte to be overwritten, and address of first byte to be moved
-    address = 20 * which_device - 16;
-    //Calculate number of bytes to moce
-    bytes_to_move = 20 * (stored_devices - which_device) + 20;
-    //Loop to read byte 20 positions away and write to byte to be wirtten over 
-    for (i = 0; i < bytes_to_move; i++){
-        character = eeprom.EEPROM_read(address + 20 +i);
-        eeprom.EEPROM_write((address + i), character);
+
+  if (which_device){  
+    Serial.println("\nOK To Remove Device? ");
+    if (yes_or_no()){
+      Serial.println("");  
+      //Find address of first byte to be overwritten, and address of first byte to be moved
+      address = 20 * which_device - 16;
+      //Calculate number of bytes to moce
+      bytes_to_move = 20 * (stored_devices - which_device) + 20;
+      //Loop to read byte 20 positions away and write to byte to be wirtten over 
+      for (i = 0; i < bytes_to_move; i++){
+          character = eeprom.EEPROM_read(address + 20 +i);
+          eeprom.EEPROM_write((address + i), character);
+      }
+      //Reduce the number of devices in EEPROM address 3 (the number of stored devices)
+      eeprom.EEPROM_write(3, (stored_devices - 1));
+      // Say operation is complete
+      Serial.println("Operation complete");  
     }
-    //Reduce the number of devices in EEPROM address 3 (the number of stored devices)
-    eeprom.EEPROM_write(3, (stored_devices - 1));
-    // Say operation is complete
-    Serial.println("Operation complete");  
   }
 }
 
