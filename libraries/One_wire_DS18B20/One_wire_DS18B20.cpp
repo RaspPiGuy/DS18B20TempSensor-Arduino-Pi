@@ -48,7 +48,7 @@ this operation one time slot long. */
 void DS18B20_INTERFACE::master_write1(){  
   PORT &= ~(1 << PORT_PIN);  //Data pin = 0     
   DDR |= (1 << PORT_PIN);  //Data pin is OURPUT  
-  delayMicroseconds(13 / CLOCK_FACTOR);  
+  delayMicroseconds(13 / CLOCK_FACTOR); 
   DDR &= ~(1 << PORT_PIN);  //Data pin is INPUT 
   delayMicroseconds(54 / CLOCK_FACTOR);   
 }  

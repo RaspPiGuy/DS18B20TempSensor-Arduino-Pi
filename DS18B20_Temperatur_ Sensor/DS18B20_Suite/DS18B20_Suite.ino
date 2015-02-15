@@ -6,7 +6,7 @@ This includes:
   Read_Temperature.ino
   Scan_For_Alarm.ino
   Find_new_device.ino
-  Edit_Description.ino
+  Edit_Stored_Information.ino
   Devices_On_The_Bus.ino
   Devices_In_EEPROM.ino
   Remove_Device_From_EEPROM.ino
@@ -1269,7 +1269,7 @@ void setup() {
       Serial.println(F("  3.  Add New Device To 1-Wire Bus"));
       Serial.println(F("  4.  Display Devices On The 1-Wire Bus"));
       Serial.println(F("  5.  Display Devices In The EEPROM"));
-      Serial.println(F("  6.  Edit Device Description In The EEPROM"));
+      Serial.println(F("  6.  Edit Stored Information"));
       Serial.println(F("  7.  Remove Device From The EEPROM"));  
       Serial.println(F("  0.  Exit")); 
       Serial.println(F("Enter 0 to 7"));
