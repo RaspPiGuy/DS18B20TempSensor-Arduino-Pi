@@ -1,13 +1,6 @@
 
 /*  Receives Manchester Encoded Data From Transmitting Arduino.
 
-This is a script mainly to troubleshoot RF connection between transmitter and 
-receiver. It will not transmit data to the RaspberryPi.  If it see the 
-synhchronization pulses from the transmitter it will receive and display
-the data mfollowing the synchronization pulses.  The data is displayed in
-hex format.  Finally, the CRC is calculated and either "CRC OK" or "CRC Bad"
-will be displayed at the end of the line.
-
 Data starts low then a 101010 pattern, then two synchronization pulses 11110000
 followed by a 10. Raw data is transmitted at 600 bits/sec.  Encoded data is 
 twice that rate of 1200 baud.  Manchester encoding ensures there will never be 
@@ -22,7 +15,7 @@ Sketch performs manchester decoding, checks CRC, and upon request, sends
 scratchpad data to python program on the Raspberry Pi.
 
 
-MJL - thepiandi.blogspot.com    2/21/2015
+MJL - thepiandi.blogspot.com    9/18/2014
 */
 
 #include <avr/io.h>
@@ -32,7 +25,8 @@ volatile  boolean found_transistion;
 const int frame_len = 20;
 byte frame[frame_len];  // Data for one sensor from transmitting device
 const int bit_time = 833;  //833 usec. = 1200 baud (600 for data)
-//char xmit_data[200];
+#define PIN PIND //Arduino Input is on port D
+#define DATAMASK 0x04  //Arduino pin 2 or PD2
 
 /*--------------------------Interrupt Service Routine----------------------------*/
 ISR(INT0_vect){
@@ -55,16 +49,16 @@ void synchronize(){
     time = micros();  
     while (!found_transistion);   // We stay here until interrupt occurs
     duration = micros() - time;
-    val = PIND & 0x04;   // PD2 pin - Arduino pin 2
+    val = PIN & DATAMASK;
     if (!val){
       if ((duration > lower_threshhold) & (duration < upper_threshhold)){  //time of 4 bits +/= 10%
         found_transistion = false;
         time = micros();  
         while (!found_transistion);
         duration = micros() - time;
-        val = PIND & 0x04;
+        val = PIN & DATAMASK;
         if (val){
-          if ((duration > lower_threshhold) & (duration < upper_threshhold)){
+          if ((duration > lower_threshhold) & (duration < upper_threshhold)){  //time of 4 bits +/= 10%
             sync = true;
           }
         }
@@ -81,7 +75,7 @@ void manchester_data(){
   boolean present_bit;  // keeps track of last bit of Manchester encoded data
   byte hold_byte = 0;   // recovered data flows into this variable
   int threshhold = bit_time + bit_time / 2;  // bit_time + 50%
-  	
+	
   // Finding the single positive pulse after synchronization
   found_transistion = false;
   while (!found_transistion);
@@ -178,17 +172,34 @@ void loop() {
   synchronize();  //find synchronization
   manchester_data();  //find one frame worth of data, get frame[]
   
-  for (i = 0; i < frame_len; i++){
-    Serial.print(frame[i], HEX);
-    Serial.print(" ");
-  }
     
   if (!calculateCRC_byte(frame, frame_len)){
-    Serial.println("CRC OK");
+    number_of_sensors = frame[0];
+
+    char xmit_data[number_of_sensors * frame_len];  //define xmit_data here
+    for (j = 0; j < frame_len; j++){
+      xmit_data[j] = frame[j];
+    }
+    
+    //this will add the rest of the sensors    
+    for (i = 1; i < number_of_sensors; i++){      
+      synchronize();  //find synchronization
+      manchester_data();  //find one frame worth of data, get frame[]
+      if (calculateCRC_byte(frame, frame_len)){
+        CRCs_good = false;
+      }
+      else{
+        for (j = 0; j < frame_len; j++){
+          xmit_data[frame_len * i + j] = frame[j];
+        }
+      }	
+    }
+    
+    if (CRCs_good){
+      transmit_data(xmit_data, frame_len * number_of_sensors);
+    }
   }
-  else{
-    Serial.println("CRC Bad");
-  }
+  delay(100);
 }
 
 
