@@ -15,7 +15,7 @@ Sketch performs manchester decoding, checks CRC, and upon request, sends
 scratchpad data to python program on the Raspberry Pi.
 
 
-MJL - thepiandi.blogspot.com    9/18/2014
+MJL - thepiandi.blogspot.com    3/15/2015
 */
 
 #include <avr/io.h>
@@ -139,13 +139,6 @@ void transmit_data(char xmit_data[], int xmit_length){
       }
     } //if not "s" go back to top of loop
   }  //if no serial data available, go back to top of loop
-/*
-  for (int i = 0; i < xmit_length; i++){
-    Serial.print(xmit_data[i]);
-    Serial.print(" ");
-  }
-  Serial.println("");
-*/  
 }
 
 /*_______________________________Main Program____________________________________*/
@@ -157,7 +150,7 @@ void setup() {
   EICRA = B00000001;   // Any change will trigger interrupt
   EIMSK = B00000001;   // Enable INT0 interrupt
   
-  Serial.begin(9600);
+  Serial.begin(115200);
 
 }
 /*------------------------------------loop()------------------------------------*/

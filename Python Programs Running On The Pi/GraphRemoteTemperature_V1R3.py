@@ -23,7 +23,7 @@ from pyrrd.graph import Graph
 import serial
 
     
-ser = serial.Serial('/dev/ttyAMA0', 9600, timeout = 5)
+ser = serial.Serial('/dev/ttyAMA0', 115200, timeout = 5)
 frame_length = 20  # One frame is all the data for one device.
 global start_time
 
