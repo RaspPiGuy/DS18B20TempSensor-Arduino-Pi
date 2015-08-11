@@ -1,14 +1,18 @@
 #!/usr/bin/python
 
 """
-Graphs temperature results from up to 12 sensors. Sensors are connected to Arduino
+Graphs temperature results from up to 12 sensors. Sensors are connected to box
+which is controlled by an ATmega328P.
+
+In this version, the box communicates with the Pi with a 434MHz RF receiver. The
+Pi is connected to the Gertboard.  The ATmega328P on the Gertboard connects to a
+434MHz receiver.  The ATmega on the Gertboard communicates with the Pi over their
+shared UART (serial) interface.
 
 Description of this program is on my blog.
 
-MJL - thepiandi.blogspot.com - 02/21/2015
+MJL - thepiandi.blogspot.com - 08/08/2015
 """
-
-# MJL -- www.thepiandi.blogspot.com --  10/31/2014
 
 import os
 from datetime import datetime
@@ -35,8 +39,8 @@ def retrieve_serial():
     The Gertboard checks to see if this character is present
     If so it will write the last series of measurements to the serial port
     This function reads the data on the serial port every second
-      until it finds the number of bytes to match a multiple of the
-      number of bytes for each device.
+    until it finds the number of bytes to match a multiple of the
+    number of bytes for each device.
     If the serial data is not found in 10 seconds, the function exits
     Returns the length of the message it has received.
     """
@@ -73,8 +77,8 @@ def number_of_sensors():
     This calls retrieve_serial()
     retrieve_serial() returns the length of the receive data
     This function calculates the number of sensors from the
-      received data and populates recv_data[] with all the
-      data retrieved from the Gertboard.
+    received data and populates recv_data[] with all the
+    data retrieved from the Gertboard.
     Returns the number of sensors
     """
     global recv_data
@@ -93,14 +97,14 @@ def number_of_sensors():
 
 def get_stored_data():    
     """
-     Called to retrieve number of sensors, device numbers, and resolution
-     Reads Gertboard data twice.  Number of sensors and sorted device
-        numbers must match to pass
-     Makes three tries with 1 munute between tries
-     If we pass, returns nuber of sensors and sorted device numbers.  This
-        data becomes constant.  Subsequent reads are compared to these values
-     If we fail, returns 0 for number of sensors and empty string for sorted
-        device numbers.  Program will subsequently halt.
+    Called to retrieve number of sensors, device numbers, and resolution
+    Reads Gertboard data twice.  Number of sensors and sorted device
+    numbers must match to pass
+    Makes three tries with 1 munute between tries
+    If we pass, returns nuber of sensors and sorted device numbers.  This
+    data becomes constant.  Subsequent reads are compared to these values
+    If we fail, returns 0 for number of sensors and empty string for sorted
+    device numbers.  Program will subsequently halt.
     """
     trials = 0
     global missed_attempts
@@ -128,9 +132,9 @@ def get_measurement(orig_sorted_order):
     Called to obtain the data from Gertboard for the measuremsnts.
     Calls number_of_sensors() and get_order()
     Checks that the number of sensors and the sorted order of device numbers
-      match what was obtained at the start of the program.
+    match what was obtained at the start of the program.
     If a match does not occur, we try twice more.  If a match fails, we
-      return False.
+    return False.
     In the process, recv_data[] is updated with current data
     """
 

@@ -59,7 +59,7 @@ July 2, 2014
 
 **  Remove_Device_From_EEPROM - Allows user to remove ROM code and description for any device.  This does not remove information from the device's scratchpad or the device's EEPROM.
 
-July 20, 2014
+July 20, 2014:
 *   Starting with python sketches, written for the Raspberry Pi, wrote a library for the 2 line by 16 character LCD display.  
 
 *   Using the LCD display library, wrote sketch "Input_to_TwoLineDisplay". User can input a text string up to 100 characters.  The text is parsed into segments such that only complete words are displayed on the 16 character LCD display.
@@ -69,12 +69,40 @@ July 20, 2014
 *   At this time, LCD has not been incorporated into DS18B20 temperature measurements.
 
 August 19, 2014
-*   Added sketch, "DS18B20_Suite".  This combines the sketches:
-      Read_Temperature
-      Scan_for_Alarms
-      Find_New_Device
-      Devices_On_The_Bus
-      Devices_in_EEPROM
-      Edit_Stored_Information
-      Remove_Device_From_EEPROM
+*   Added sketch,: "DS18B20_Suite".  This combines the sketches:
+* Read_Temperature
+* Scan_for_Alarms
+* Find_New_Device
+* Devices_On_The_Bus
+* Devices_in_EEPROM
+* Edit_Stored_Information
+* Remove_Device_From_EEPROM
 into one sketch with a menu for the user to select the desired operation.
+
+August 10, 2015:
+	In the year since this has been updated, much has been added:
+
+*	Constructed an enclosure that contains:
+* Protoboard with an ATmega328P to interface the temperature sensors with devices to send data to the Raspberry Pi.  
+* The enclosure circuitry is powered by a 3.7V 1200maH Lithium Ion Polymer battery 
+* The LiPo battery feeds an Adafruit 500mA. 5V power boost. 
+* A SparkFun basic LiPo battery charger with mini-USB.
+* 2 line by 16 character LCD display that displays one of the sensor's description and current temperature measurement.
+* A momentary switch that allows the operator to cycle the display between the sensors.
+* A permanently mounted DS18B20 temperature sensor
+* Three connectors for additional DS18B20 temperature sensors installed in cables.  A large number of the sensors can be daisy-chained to one connector.
+* The data from the ATmega328P is manchester encoded and is connected (via a DPDT switch) to either a 434MHz RF transmitter or to a ESP8266 WiFi board.
+* The data consists of 20 bytes for each sensor connected to the enclosure.  This data consists of:
+o Byte 0:  The number of sensors connected to the enclosure
+o Bytes 1, and 2:  DS18B20 scratchpad data - the measured temperature
+o Byte 3: DS18B20 scratchpad data - upper temperature alarm
+o Byte 4: DS18B20 scratchpad data - lower temperature alarm
+o Byte 5: DS18B20 scratchpad data - resolution
+o Bytes 6 through 17: from the ATmega EEPROM - device description
+o Byte 18: from the ATmega EEPROM - the sensor number
+o Byte 19: CRC (cyclic redundancy check)
+* The WiFi ESP8266 board contains an ESP-12 module, a 3.3V regu7lator, and 5V to 3.3V conversion circuitry for the incoming data from the ATmega module and for the FTDI received data.  
+* The WiFi ESP8266 board receives the manchester encoded data from the ATmega board, decodes it and checks the CRC.  This board connects to a WiFi network and acts as a client.  When requested by the Raspberry Pi (the server) the board will send the last collected data from all of the attached sensors to the Raspberry Pi.
+* Both the ATmega board and the WiFi board have connectors assessable through an opening in the side of the enclosure for an FTDI basic.  This allows the firmware to be changed at any time.  For the ATmega board, if a new sensor were to be added, or if description, resolution, or upper or lower temperature alarm limits needed to be changed, it would be necessary to load the DS18B20 suite (described above).  If a different WiFi network was used, the firmware for the WiFi board would need to be altered and reloaded for a new SSID and password.
+*	As an alternative to the WiFi connection between the enclosure and the Pi, a board was constructed with a 434MHz receiver.  The receiver demodulates the 434MHz signal from the enclosure.  This demodulated signal is the manchester encoded data containing the sensor data.  The data output from the receiver connects to a Gertboard.  The ATmega328P on the Gertboard decodes the manchester data and checks the CRC.  The ATmnega328P on the Gertboard connects to the Raspberry Pi's UART port.  When the Pi requests data, the serial data is sent via the UART port.
+*	
