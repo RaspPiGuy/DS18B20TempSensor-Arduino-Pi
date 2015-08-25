@@ -1,19 +1,34 @@
 
-/*  DS18B20_Suite.ino      thepiandi.blogspot.com     MJL 081814
-This sketch is a compilation of the 7 sketches developed for the DS18B20 1-wire temperature sensor.
+/*  DS18B20_Suite.ino      thepiandi.blogspot.com     MJL August 25, 2015
 
-This includes:
-  Read_Temperature.ino
-  Scan_For_Alarm.ino
-  Find_new_device.ino
-  Edit_Stored_Information.ino
-  Devices_On_The_Bus.ino
-  Devices_In_EEPROM.ino
-  Remove_Device_From_EEPROM.ino
+
+Provides interface to DS18B20 temperature sensor and to the AYmega328P EEPROM. Here are the services this
+menu driven sketch provides:
+  Read_Temperature - reads temperature from selected, connected, sensors with options
+  Scan_For_Alarm - scans connected sensors to see if any are measuring out of tolerance temperatues
+  Find_new_device - detects new sensors. User adds descriptionl resolution, and alarm settings
+  Edit_Stored_Information - Allows user to mmodify description, resolution, and alarm settings
+  Devices_On_The_Bus - reports the ROM code of all connected sensors
+  Devices_In_EEPROM - reports description and calibration of all sensors in the EEPROM
+  Remove_Device_From_EEPROM - removes sensor from the E3EPROM
   
-There is a menu allowing the user to choose the desired sketch.
+The ATmega328P's 1024 byte EEPROM is used to store data about the sensors.  The first three bytes 
+(bytes - 0 2) are reserved for future use.  The forth byte (byte 3) contains the number of sensors 
+listed in the EEPROM.  Following byte 3 is 22 bytes for each sensor. The first 8 bytes are the ROM
+code, and the next 12 bytes make up the description. The 21st. byte is the low temperature calibration
+factor (0 degrees C.), while the last byte is the high temperature calibration factor (100 degree C.).
 
-All of the original comments from each sketch are included here.
+Each DS18B20 contains a scrathpad memory.  The first two bytes are for the temperature measurements. 
+The next three bytes can be written to by the user and consist of the upper and lower temperature
+alarm and the resolution (9, 10, 11, or 12 bits).
+
+Version 2:  Added the temperature corrections for the calibration factors.  Was necessary to account
+  for the increase of the bytes in EEPROM, for each sensor, from 20 to 22.  - August 21, 2015
+  
+Version 3:  Accounts for the fact that all sensors in the EEPROM may not be connected.  Only asks
+  the user to choose connected devices.  Improved the Edit EEPROM function by allowing user to
+  exit without saving changes. - August 24, 2015
+
   
 */
 
@@ -25,34 +40,71 @@ DS18B20_INTERFACE ds18b20;
 EEPROM_FUNCTIONS eeprom;
 TERM_INPUT term_input;
 
+boolean connected_devices[50];
+int number_of_connected_devices;
+
 /*_____________________________________FUCTIONS COMMON TO ALL FUNCTIONS______________________________*/
 
 /*---------------------------------------------find_stored_devices-------------------------------------*/
 int find_stored_devices(){
   int stored_devices, address, character;
-  
+  byte rom[8];
+  byte scratchpad[9];
+  int i, j, k;
+ 
   //How Many devices stored in the EEPROM?
   stored_devices = eeprom.EEPROM_read(3); 
   if (stored_devices == 0xFF){   //condition if EEPROM has been cleared.
     stored_devices = 0;  
   }
+  number_of_connected_devices = stored_devices;
+  
+  for (i = 0; i < stored_devices; i++){
+    connected_devices[i] = true;
+  }  
+  
   if(stored_devices){
     //List the devices Srored in EEPROM
-    address = 12;
-    for (int i = 0; i < stored_devices; i++){
+    for (i = 0; i < stored_devices; i++){
+      address = 22 * i + 4; 
+      
+      //Get ROM code from EEPROM
+      for (j = 0; j < 8; j++){  //get the ROM code
+        rom[j] = eeprom.EEPROM_read(address + j);
+      } 
+     
+      //Get and print description
+      address += 8;
+      
       Serial.print(F("Device No: "));
       Serial.print(i + 1);
-      Serial.print(F("  Descriptiom: "));
+      Serial.print(F("  Description: "));
    
       character = 0;
-      for (int j = 0; (j < 12 && character != 255); j++){
+      for (j = 0; (j < 12 && character != 255); j++){
         character = eeprom.EEPROM_read(address +j);
         if (character != 255){
           Serial.print(char(character));
         }
       }
+      
+      //find if device is connected to enclosure
+      ds18b20.initialize();
+      ds18b20.match_rom(rom);      
+      ds18b20.read_scratchpad(scratchpad); 
+ 
+      // check CRC, if true. CRC failed and device in not connected to enclosure
+      if (ds18b20.calculateCRC_byte(scratchpad, 9)){
+        connected_devices[i] = false;
+        number_of_connected_devices--;
+        Serial.print(F("\tDevice is NOT Connected"));
+      }
+      else{
+       Serial.print(F("\tDevice is Connected"));
+      }
+      
       Serial.println(F(""));  
-      address += 20;
+      address += 22;
     }
     Serial.println(F(""));
   }
@@ -97,6 +149,35 @@ long how_many(long lower_limit, long upper_limit){
   return menu_choice; 
 }
 
+/*---------------------------------------------apply_calibratiom-----------------------------------*/
+float apply_calibration(byte cal_hi, byte cal_lo, float measured){
+  float corrected_temp, correction_hi, correction_lo;
+  int cal_hi_int, cal_lo_int;
+  
+  //get 100 degree C. temperature correction
+  cal_hi_int = cal_hi;
+  
+  //check if negative
+  if (cal_hi_int > 128){
+    cal_hi_int += 65280;
+  }
+  correction_hi = cal_hi_int / 16.0;
+  
+  //get 0 degree C. temperature correction
+  cal_lo_int = cal_lo;
+  
+  //check if negative
+  if (cal_lo_int > 128){
+    cal_lo_int += 65280;
+  }
+  correction_lo = cal_lo_int / 16.0;
+  
+  corrected_temp = measured - (measured * ( correction_hi - correction_lo ) / 100.00 + correction_lo);
+  
+  return corrected_temp;
+}
+
+
 /*________________________________________READ TEMPERATURE_________________________________________*/
 
 /*  Read_Temperatures.ino    thepiandi@blogspot.com       MJL  062914
@@ -125,17 +206,18 @@ InputFromTerminal library is used to enter integer values from the keyboard.
 */
 
 /*---------------------------------------------read_temperature-------------------------------------*/
-void read_temperature(int stored_devices){
+void read_temperature(){
   byte rom[8];
   byte scratchpad[9];
   int description[12];
   byte alarm_and_config[3] = {0x7D, 0xC9, 0x7F};
-  float temp_c, temp_f;
+  float temp_c, corrected_temp_c, temp_f;
   int address;
   int i, j, k;
   int conversion_time; 
-  long which_device, measurements, delay_between_measurements, resolution;  
-  boolean make_run = false;
+  long which_device, delay_between_measurements, resolution; 
+  long measurements = 0; 
+  int make_run;
   int init_failures = 0;
   int crc_errors = 0;
   int number_of_devices_to_run;
@@ -144,72 +226,100 @@ void read_temperature(int stored_devices){
   int high_alarm, low_alarm;
   boolean display_scratchpad;
   int spaces;
+  int character;
+  byte cal_factor_lo, cal_factor_hi;
+  boolean all_or_one = false;
+  
+  int stored_devices = find_stored_devices();
   boolean devices2run[stored_devices];
   float averages[stored_devices];
-  int character;
+
+  number_of_devices_to_run = number_of_connected_devices;
   
-  number_of_devices_to_run = stored_devices;
-  
+  //exit if there are no connected devices
+  if (!number_of_connected_devices){
+    Serial.println(F("No devices connected"));
+    delay(1000);
+    return;
+  }
+   
   //Interface with user. Keep in loop until user is satisfied with choices
   do{
-    //Set up array for devices to run as all true  
+    //Set up array for devices to run  
     for (i = 0; i < stored_devices; i++){
-      devices2run[i] = true;
+      devices2run[i] = connected_devices[i];
       averages[i] = 0;
     }
-    /*Ask if all devices are to be run.  If Yes determine if any device is 
-    connected using parasitic power, otherwise query each device and determine
-    if the selected device is connected using parasitic power.*/
-    Serial.println(F("Run all devices? "));
-    if (yes_or_no()){  //If yes is selected this will be true
+    
+    //If only one connected device don't ask to run all devices
+    if (number_of_connected_devices > 1){
+      Serial.println(F("Run all devices? "));
+     
+      //Ask if all devices are to be run.  If No, query each device and determine
+      //if the selected device is connected using parasitic power.
+      if (!yes_or_no()){  //If no is selected this will be true
+
+        //no was selected so query each device
+        for (i = 0; i < stored_devices; i++){
+          if (devices2run[i]){
+            Serial.print(F("\nRun device number "));  
+            Serial.print(i + 1);
+            Serial.println(F("?"));
+       
+            if (!yes_or_no()){  //If answer is no, make array entry for device false
+              devices2run[i] = false;
+              number_of_devices_to_run--;
+            } 
+            else{  //Determine if it is connected using parasitic power
+              if (ds18b20.initialize()){
+                Serial.println(F("Initialization Failure"));
+              }
+              else{
+                address = 22 * i +4;   //Get ROM code from EEPROM
+                for (k = 0; k < 8; k++){   
+                  rom[k] = eeprom.EEPROM_read(address +k);
+                } 
+                ds18b20.match_rom(rom); 
+                if (!ds18b20.read_power_supply()){  //A zero means parasitic
+                  parasitic = true;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      //selected to run all devices
+      else{
+        all_or_one = true;
+      }
+    }
+     
+    //only one device
+    else{
+      all_or_one = true;
+    }
+    
+    //do if only one or all devices
+    if (all_or_one){
       if (ds18b20.initialize()){
         Serial.println(F("Initialization Failure on Read_Power_Supply"));
       }
       else{
         ds18b20.skip_rom();
-        if (ds18b20.read_power_supply()){
-          Serial.println(F("\nNo device is connected using parasitic power\n"));
-        }
-        else{
-          Serial.println(F("\nA device is connected using parasitic power\n"));
+        if (!ds18b20.read_power_supply()){
           parasitic = true;
         }
       }     
     }
-    else{  //No was selected so query for each device.
-      for (i = 0; i < stored_devices; i++){
-        Serial.print(F("\nRun device number "));  
-        Serial.print(i + 1);
-        Serial.println(F("?"));
-        
-        if (!yes_or_no()){  //If answer is no, make array entry for device false
-          devices2run[i] = false;
-          number_of_devices_to_run--;
-        } 
-        else{  //Determine if it is connected using parasitic power
-          if (ds18b20.initialize()){
-            Serial.println(F("Initialization Failure"));
-          }
-          else{
-            address = 20 * i +4;   //Get ROM code from EEPROM
-            for (k = 0; k < 8; k++){   
-              rom[k] = eeprom.EEPROM_read(address +k);
-            } 
-            ds18b20.match_rom(rom); 
-            if (!ds18b20.read_power_supply()){  //A zero means parasitic
-              parasitic = true;
-            }
-          }
-        }
-      }
-      if (parasitic){
-        Serial.println(F("\nA device is connected using parasitic power"));
-      }  
-      else{
-        Serial.println(F("\nNo device is connected using parasitic power"));
-      }    
-      Serial.println(F(""));
-    }
+    
+    if (parasitic){
+      Serial.println(F("\nA device is connected using parasitic power"));
+    }  
+    else{
+      Serial.println(F("\nNo device is connected using parasitic power"));
+    }    
+    Serial.println(F(""));
 
     //Ask number of measurements, time between measurements
     Serial.print(F("How many measurements would you like to make? "));
@@ -244,15 +354,27 @@ void read_temperature(int stored_devices){
     display_scratchpad = yes_or_no();
     Serial.println(F(""));
     
-    Serial.println(F("OK To Make Run? "));
-    make_run = yes_or_no();
-    if (!make_run){
-      Serial.println(F(""));
+    //check if at least one device has been selected
+    if (number_of_devices_to_run){
+      Serial.println(F("Select 1 to Make Run, 2 to Edit Choices, 3 to Exit "));
+      make_run = how_many(1, 3);
+      if (make_run == 3){
+        return;
+      }
+      else if (make_run == 2){
+        Serial.println(F(""));
+      } 
     }
-      
-  }while (!make_run);
-  Serial.println(F(""));
-   
+    else{
+      Serial.println(F("Select at least one device, please\n\n"));
+      delay(1000);
+      number_of_devices_to_run = number_of_connected_devices;
+      make_run = 2;
+    }      
+  }while (make_run == 2);
+  Serial.println(F(""));  
+  
+  //finally ready to make measurements 
   //Outer measurement loop
   //Run for each measurement
   for (i = 0; i < measurements; i++){  
@@ -262,14 +384,24 @@ void read_temperature(int stored_devices){
     //Run for each device
     for (j = 0; j < stored_devices; j++){  
       if (devices2run[j]){  //check to see if device is to be run
-        address = 20 * j +4;   //Get ROM code from EEPROM
+        address = 22 * j +4;   //Get ROM code from EEPROM
         for (k = 0; k < 8; k++){
           rom[k] = eeprom.EEPROM_read(address + k);
         } 
+        //Get Descriotion
         address += 8;
         for (k = 0; k < 12; k++){  //Get description
           description[k] = eeprom.EEPROM_read(address + k);
         }
+        
+        //Get upper and lower calibration factors
+        address += 12;
+        cal_factor_lo = eeprom.EEPROM_read(address);
+        cal_factor_hi = eeprom.EEPROM_read(address + 1);
+        
+        //debug:
+        //Serial.println(cal_factor_lo);
+        //Serial.println(cal_factor_hi);
                      
         //Match ROM followed by read Scratchpad for resolution and alarm temperatures
         if (ds18b20.initialize()){
@@ -298,7 +430,7 @@ void read_temperature(int stored_devices){
             else{
               low_alarm = float(scratchpad[3]) * 1.8 + 32.0;  //convert to deg F
             }
-            //Retreive low temperature alarm            
+            //Retreive resolution            
             resolution = scratchpad[4];
             resolution = (resolution >> 5) + 9;
           }
@@ -339,7 +471,15 @@ void read_temperature(int stored_devices){
               temp_c -= 65536;          //calculates 2's complement
             }
             temp_c /= 16.0;
-            temp_f = 1.8 * temp_c + 32.0;
+            
+            corrected_temp_c = apply_calibration(cal_factor_hi, cal_factor_lo, temp_c);
+            
+            //debug:
+            //Serial.println(temp_c);
+            //Serial.println(corrected_temp_c);
+            
+            
+            temp_f = 1.8 * corrected_temp_c + 32.0;
             averages[j] += temp_f;
             
             Serial.print(F("  Temp.: "));
@@ -374,7 +514,7 @@ void read_temperature(int stored_devices){
       if (devices2run[i]){
         Serial.print(F("Average for Device - "));
         spaces = 14;
-        address = 20 * i + 12;
+        address = 22 * i + 12;
         character = 0;
         for (int j = 0; (j < 12 && character != 255); j++){
           character = eeprom.EEPROM_read(address +j);
@@ -405,13 +545,6 @@ void read_temperature(int stored_devices){
   Serial.println(F(""));         
 }
 
-/*---------------------------------------setup for read temperature-----------------------*/
-void read_temp_setup() {
-  int stored_devices = find_stored_devices();
-  if (stored_devices){
-    read_temperature(stored_devices);
-  }
-}
 /*______________________________________SCAN FOR ALARMS__________________________________*/
 
 /*  Scan_For_Alarm.ino  thepiandi@blogspot.com      MJL  070214
@@ -443,7 +576,7 @@ void alarms(){
   int loop_device, loop_bytes;
   boolean match;
   boolean found_new = false;
-  char device_description[20];
+  char device_description[13];
   int no_chars_from_term;
   int high_alarm, low_alarm, resolution;
   
@@ -473,13 +606,13 @@ void alarms(){
     if (!ds18b20.read_power_supply()){ //will return 0 if any parasitic
       parasitic_all_devices = true;
     }
-    //Command skip_rom() followed by Convert_t()
     if (ds18b20.initialize()){
       Serial.println(F("Initialization Failure on Skip ROM"));
       proceed = false;
     }
   }
-  //Do a convert t
+  
+  //Command skip_rom() followed by Convert_t()
   if (proceed){
     ds18b20.skip_rom();
     ds18b20.convert_t(parasitic_all_devices, 12);
@@ -505,16 +638,21 @@ void alarms(){
       }
       
       if (proceed){
-        //If we got this far there is at least one device with its alarm flag set:
-        //The just found ROM code is copied to Rom_no which is passed to alarm_search()
-        //to possibly find another device woth an alarm flag set
+        /*
+          If we got this far there is at least one device with its alarm flag set:
+          
+          The ROM code that was just found is copied to Rom_no which is passed to alarm_search()
+        to possibly find another device w1th an alarm flag set
     
-        //Now that we know that a device has its alarm flag set, we will use the ROM
-        //code found in Rom_no[] to search the ATmega EEPROM to find the device's 
-        //description. We will search the device's scratchpad for the temperature limits
-        //and its resolution. 
-        //Next we will do a temperature measurement of the device and print out
-        //this measurement along with the temperature upper and lower limit and resolution.
+          Now that we know that a device has its alarm flag set, we will use the ROM
+        code found in Rom_no[] to search the ATmega EEPROM to find the device's 
+        description and calibration factors. 
+        
+          We will search the device's scratchpad for the temperature limits and its resolution. 
+          
+          Next we will do a temperature measurement of the device, apply cal. factors and print out
+        this measurement along with the temperature upper and lower limit and resolution.
+        */
         
         //We'll do a CRC check on the ROM code
         if (ds18b20.calculateCRC_byte(Rom_no, 8)){
@@ -527,7 +665,7 @@ void alarms(){
           //loop for each device in EEPROM. When a match is found, exit the loop
           match = false;
           for (loop_device = 0; (loop_device != stored_devices && !match); loop_device++){
-            address = 20 * loop_device + 4;  //jump to first byte of device in EEPROM
+            address = 22 * loop_device + 4;  //jump to first byte of device in EEPROM
             match = true;
             //loop for each byte.  Compares byte in EEPROM with byte in Rom_no.
             //Exits if a byte does not match. and makes match false. 
@@ -604,7 +742,7 @@ void alarms(){
         else{
           low_alarm = float(scratchpad[3]) * 1.8 + 32.0;  //convert to deg F
         }
-        //Retreive low temperature alarm            
+        //Retreive resolution            
         resolution = scratchpad[4];
         resolution = (resolution >> 5) + 9;
         
@@ -684,7 +822,7 @@ void new_device_to_EEPROM(){
   int loop_device, loop_bytes;
   boolean match;
   boolean found_new = false;
-  char device_description[20];
+  char device_description[13];
   int no_chars_from_term;
   int high_alarm, low_alarm, resolution;
   
@@ -699,7 +837,7 @@ void new_device_to_EEPROM(){
   if (stored_devices == 0xFF){   //condition if EEPROM has been cleared.
     stored_devices = 0;  
   }
-  if (stored_devices < 50){
+  if (stored_devices < 46){
     last_device = 0;
     //Do until the last device connected to the bus is found by search_rom().
     do {
@@ -708,7 +846,7 @@ void new_device_to_EEPROM(){
         match = false;
         //loop for each device in EEPROM. If a match is found, exit the loop
         for (loop_device = 0; (loop_device != stored_devices && !match); loop_device++){
-          address = 20 * loop_device + 4;  //jump to first byte of device in EEPROM
+          address = 22 * loop_device + 4;  //jump to first byte of device in EEPROM
           match = true;
           //loop for each byte.  Compares byte in EEPROM with byte in Rom_no.
           //Exits if a byte does not match. and makes match false. 
@@ -741,7 +879,7 @@ void new_device_to_EEPROM(){
             into DS18B20's scratch pad.  Configuration data is the resolution */
             
             //Storing the Rom Code into the next device location in EEPROM
-            address = 20 * stored_devices + 4;  
+            address = 22 * stored_devices + 4;  
             for (i = 0; i < 8; i++){
               eeprom.EEPROM_write(address, Rom_no[i]);
               address += 1;
@@ -760,6 +898,12 @@ void new_device_to_EEPROM(){
             if (no_chars_from_term < 12){
               eeprom.EEPROM_write(address, 255); 
             }  
+            
+            //Store 0's into the two calibration bytes
+            address = 22 * (loop_device + 1) + 2;  //jump to next device -2
+            eeprom.EEPROM_write(address, 0);
+            address += 1;
+            eeprom.EEPROM_write(address, 0);
             
             //update the number of devices in the EEPROM at address 3
             stored_devices++;
@@ -888,15 +1032,15 @@ InputFromTerminal library is used to enter integer values from the keyboard.
 /*---------------------------------------------edit_description-------------------------------------*/
 void edit_description(int which_device){
   int no_chars_from_term;
-  boolean make_run = false;
+  int make_run;
   int character;
   int address;
-  char device_description[20];
+  char device_description[13];
   int i, j;
   
   //Interfce with user. Keep in loop until user is satisfied with choice
   do{
-    address = 20 * which_device - 8;
+    address = 22 * (which_device - 1) + 12;
     
     Serial.print(F("\nCurrent description for device number ")); //Print current description
     Serial.print(which_device);
@@ -928,12 +1072,16 @@ void edit_description(int which_device){
     Serial.println(F(""));
     
     //Check if user is satisfied
-    Serial.println(F("\nSatisfied With Description? "));
-    make_run = yes_or_no();
-    if (!make_run){
+    Serial.println(F("\nSelect 1 if satisfied with description, 2 to try again, 3 to exit? "));
+    make_run = how_many(1, 3);
+    
+    if (make_run == 3){
+      return;
+    }
+    else if (make_run == 2){
       Serial.println(F(""));
     }      
-  }while (!make_run);
+  }while (make_run == 2);
 
   //Write New Description  
   for (int i = 0; i < (no_chars_from_term); i++){
@@ -963,17 +1111,21 @@ void edit_scratchpad(int which_device){
     //First must reteive ROM code using match_rom()
     if (ds18b20.initialize()){
       Serial.println(F("Initialization Failure"));
+      done = true;
     }
     else{
-      address = 20 * which_device - 16;   //Get ROM code from EEPROM
+      address = 22 * (which_device - 1) + 4;   //Get ROM code from EEPROM
       for (int k = 0; k < 8; k++){   
         rom[k] = eeprom.EEPROM_read(address +k);
       } 
       ds18b20.match_rom(rom);
       //Read scratchpad and check CRC
       ds18b20.read_scratchpad(scratchpad); 
+      
+      //if CRC fails, device is not connected so exit edit
       if (ds18b20.calculateCRC_byte(scratchpad, 9)){
-        Serial.println(F("Device ROM failed CRC"));
+        Serial.println(F("Device is NOT Connected To Enclosure"));
+        done = true;
       }
 
       else{            
@@ -998,70 +1150,72 @@ void edit_scratchpad(int which_device){
         resolution = (resolution >> 5) + 9;
         Serial.print(resolution);
         Serial.println(F(" bits"));
-      }
       
-      //We ask user the upper and lower temperature alarms
-      Serial.print(F("Please enter the upper alarm temperature +257 > -67, deg F: "));
-      high_alarm = how_many(-67,257);
-      Serial.print(high_alarm);
-      Serial.println(F(" deg F"));
-      alarm_and_config[0] = (float(high_alarm) - 32.0) / 1.8; //convert to deg C            
-      if (alarm_and_config[0] < 0){
-        alarm_and_config[0] -= 256;  //makes 2's complement
-      }
-     
-      Serial.print(F("Please enter the lower alarm temperature +257 > -67, deg F: "));
-      low_alarm = how_many(-67,257);
-      Serial.print(low_alarm);
-      Serial.println(F(" deg F"));
-      alarm_and_config[1] = (float(low_alarm) - 32.0) / 1.8; //convert to deg C            
-      if (alarm_and_config[1] < 0){
-        alarm_and_config[1] -= 256;    //makes 2's complement
-      }
-      
-      //We ask user the resolution
-      Serial.print(F("Please resolution, 9 - 12 bits: "));
-      resolution = how_many(9, 12);
-      Serial.println(resolution);
-      alarm_and_config[2] = 0x1F + 0x10 * 2 * (byte(resolution) - 9);  
-      
-      //Write upper alarm, lower alarm, and configuration (resolution) to scratchpad            
-      //Match ROM followed by Write 3 bytes to ScratchPad
-      if (ds18b20.initialize()){
-        Serial.println(F("Initialization Failure on Match ROM"));
-      }
-      else{
-        //Match ROM followed by Write Scratchpad with resolution and alarms
-        ds18b20.match_rom(rom); 
-        ds18b20.write_scratchpad(alarm_and_config); 
-      }
-  
-      //In prepation for writing scratchpad to DS18B20's EEPROM
-      //will fimd out if it connected using parasitic power
-      if (ds18b20.initialize()){
-        Serial.println(F("Initialization Failure"));
-      }
-      else{
-        ds18b20.match_rom(rom); 
-        parasitic = false;
-        if (!ds18b20.read_power_supply()){  //A zero means parasitic
-          parasitic = true;
+        //We ask user the upper and lower temperature alarms
+        Serial.print(F("Please enter the upper alarm temperature +257 > -67, deg F: "));
+        high_alarm = how_many(-67,257);
+        Serial.print(high_alarm);
+        Serial.println(F(" deg F"));
+        alarm_and_config[0] = (float(high_alarm) - 32.0) / 1.8; //convert to deg C            
+        if (alarm_and_config[0] < 0){
+          alarm_and_config[0] -= 256;  //makes 2's complement
+        }
+       
+        Serial.print(F("Please enter the lower alarm temperature +257 > -67, deg F: "));
+        low_alarm = how_many(-67,257);
+        Serial.print(low_alarm);
+        Serial.println(F(" deg F"));
+        alarm_and_config[1] = (float(low_alarm) - 32.0) / 1.8; //convert to deg C            
+        if (alarm_and_config[1] < 0){
+          alarm_and_config[1] -= 256;    //makes 2's complement
+        }
+        
+        //We ask user the resolution
+        Serial.print(F("Please resolution, 9 - 12 bits: "));
+        resolution = how_many(9, 12);
+        Serial.println(resolution);
+        alarm_and_config[2] = 0x1F + 0x10 * 2 * (byte(resolution) - 9);  
+        
+        //Write upper alarm, lower alarm, and configuration (resolution) to scratchpad            
+        //Match ROM followed by Write 3 bytes to ScratchPad
+        if (ds18b20.initialize()){
+          Serial.println(F("Initialization Failure on Match ROM"));
+        }
+        else{
+          //Match ROM followed by Write Scratchpad with resolution and alarms
+          ds18b20.match_rom(rom); 
+          ds18b20.write_scratchpad(alarm_and_config); 
+        }
+    
+        //In prepation for writing scratchpad to DS18B20's EEPROM
+        //will fimd out if it connected using parasitic power
+        if (ds18b20.initialize()){
+          Serial.println(F("Initialization Failure"));
+        }
+        else{
+          ds18b20.match_rom(rom); 
+          parasitic = false;
+          if (!ds18b20.read_power_supply()){  //A zero means parasitic
+            parasitic = true;
+          }
+        }
+        
+        //Now we copy the scrathpad to the DS18B20's EEPROM
+        if (ds18b20.initialize()){
+          Serial.println(F("Initialization Failure"));
+        }
+        else{
+          ds18b20.match_rom(rom); 
+          ds18b20.copy_scratchpad(parasitic);
+        }
+    
+        //Check to see if we are done
+        Serial.println(F("\nSatisfied With Changes?"));
+        done = yes_or_no();
+        if (!done){
+          Serial.println(F(""));
         }
       }
-      
-      //Now we copy the scrathpad to the DS18B20's EEPROM
-      if (ds18b20.initialize()){
-        Serial.println(F("Initialization Failure"));
-      }
-      else{
-        ds18b20.match_rom(rom); 
-        ds18b20.copy_scratchpad(parasitic);
-      }
-    }
-     Serial.println(F("\nSatisfied With Changes?"));
-    done = yes_or_no();
-    if (!done){
-      Serial.println(F(""));
     }
   }while (!done); 
   Serial.println(F("Done With Scratchpad"));  
@@ -1148,6 +1302,8 @@ void devices_in_EEPROM(){
   int i, j, address;
   int stored_devices;
   int character;
+  float correction;
+  int cal_factor;
   
   //How Many devices stored in the EEPROM?
   stored_devices = eeprom.EEPROM_read(3); 
@@ -1156,15 +1312,21 @@ void devices_in_EEPROM(){
   }
   if(stored_devices){
     for (i = 0; i < stored_devices; i++){
-      address = 20 * i + 4;  //jump to first byte of device in EEPROM
+      address = 22 * i + 4;  //jump to first byte of device in EEPROM
+      
+      //Print the device number:
       Serial.print(F("Device No: "));
       Serial.println(i + 1);
+      
+      //Print the ROM Code:      
       Serial.print(F("\tIt's ROM code is: "));  
       for ( j = 0; j < 8; j++){
         Serial.print(eeprom.EEPROM_read(address + j), HEX);
         Serial.print(F(" "));
       }
       Serial.println(F(""));
+      
+      //Print the description:
       Serial.print(F("\tWith this description: "));
       character = 0;
       for ( j = 8; (j < 20 && character != 255); j++){
@@ -1173,7 +1335,30 @@ void devices_in_EEPROM(){
           Serial.print(char(character));
         }
       }
-      Serial.println("");
+      Serial.println(F(""));
+      
+      //Print Low and High Calibration Offsets:
+      Serial.print(F("\tLow Temperature Offset (subtract this): "));
+      cal_factor = eeprom.EEPROM_read(address + 20);
+      
+      //check if negative
+      if (cal_factor > 128){
+        cal_factor += 65280;
+      }
+      correction = 1.8 * (cal_factor / 16.0);
+      Serial.print(correction, 4);
+      Serial.println(F(" deg F"));
+ 
+      Serial.print(F("\tHigh Temperature Offset (subtract this): "));
+      cal_factor = eeprom.EEPROM_read(address + 21);
+      
+      //check if negative
+      if (cal_factor > 128){
+        cal_factor += 65280;
+      }
+      correction = 1.8 * (cal_factor / 16.0);
+      Serial.print(correction, 4); 
+      Serial.println(F(" deg F"));
     }    
   }
   else{    
@@ -1216,12 +1401,12 @@ void remove_from_EEPROM(int stored_devices){
     if (yes_or_no()){
       Serial.println("");  
       //Find address of first byte to be overwritten, and address of first byte to be moved
-      address = 20 * which_device - 16;
+      address = 22 * (which_device - 1) + 4;
       //Calculate number of bytes to moce
-      bytes_to_move = 20 * (stored_devices - which_device) + 20;
-      //Loop to read byte 20 positions away and write to byte to be wirtten over 
+      bytes_to_move = 22 * (stored_devices - which_device) + 22;
+      //Loop to read byte 22 positions away and write to byte to be wirtten over 
       for (i = 0; i < bytes_to_move; i++){
-          character = eeprom.EEPROM_read(address + 20 +i);
+          character = eeprom.EEPROM_read(address + 22 +i);
           eeprom.EEPROM_write((address + i), character);
       }
       //Reduce the number of devices in EEPROM address 3 (the number of stored devices)
@@ -1277,7 +1462,7 @@ void setup() {
       choice = how_many(0, 7);
       Serial.println("");
       if (choice == 1){
-        read_temp_setup(); 
+        read_temperature(); 
         Serial.println(F("\n\n\n\n\n"));
       }
       else if (choice == 2){

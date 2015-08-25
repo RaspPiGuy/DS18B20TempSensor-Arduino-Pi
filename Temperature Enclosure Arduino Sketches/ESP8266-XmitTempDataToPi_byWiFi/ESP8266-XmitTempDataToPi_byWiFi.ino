@@ -2,7 +2,7 @@
 Collects Manchester Encoded data from Temperature Sensor board within Temperature
 Sensor Box, decodes the data and tranmits the data to the Raspberry Pi
 
-We synchronize with the data fro, the Sensor board and decode the data from one
+We synchronize with the data from the Sensor board and decode the data from one
 sensor to find out how many sensors are connected to the temperature box.  If there
 is more than one sensor, the data from the other sensors are then collected.  
 

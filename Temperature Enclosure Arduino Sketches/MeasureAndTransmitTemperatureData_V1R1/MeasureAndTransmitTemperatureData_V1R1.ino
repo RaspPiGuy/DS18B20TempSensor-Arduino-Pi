@@ -1,19 +1,25 @@
+/* MJL - thepiandi.blogspot.com   August 25, 2015
 
-/* Transmits Manchester encoded data to my Gertboard
+ -- Transmits Manchester encoded data eitrher to ESP8266 board or to my Gertboard via RF.
 
 This sketch is to be used with my temperature measuring enclosure.  This
-device has one permanently mounted DS18B20 temperature sensor and three
-connectors for adding more sensors.  The hardware and software supports parasitic
-operation where power and ground are connected to ground and the sensor
+enclosure has three connectors for any number of sensors. Sensors can be connected
+in parallel and attached to a connector. The hardware and software supports parasitic
+operation where power and ground are connected to ground andthe sensor
 is powered via the data pin.
 
-The enclosure has a 2 line by 16 character LCD display for displaying the sensor's
+The enclosure has a 2 line by 16 character LCD display for displaying one sensor's
 description and the measured temperature.  There is also a momentary switch
 to switch between sensors to display and to blank the display. 
 
 Measurements are made from each connected sensor, in turn, and the temperature
 result, along with other data is transmitted via a 434MHz transmitter to my
-Gertboard. 
+Gertboard, or via WiFi via a ESP8266 board.  The Gertboard connects to the 
+Raspberry Pi, and the Raspberry Pu is capable of receiving the same data it
+receives from the Gertboard from the WiFi.
+
+The Raspberry Pi collects, stores, and graphs the temperature data it receives from the
+enclosure.
 
 First order of business is to determine what sensors are connected to the 
 enclosure.  The EEPROM on the ATmega328P microcontroller contains the descriptions
@@ -22,7 +28,7 @@ memory of each of these devices, in turn.  If the CRC fails, we assume the
 sensor is not connected to the enclosure.  For those sensors that are connected,
 we determine if any are connected using parasitic power.  
 
-For each connected sensor, the temperature is measured and 20 bytes of data are 
+For each connected sensor, the temperature is measured and 22 bytes of data are 
 assembled to be transmitted.  When the data for the last sensor has been 
 transmitted, the sketch starts over with the first sensor.
 
@@ -43,9 +49,11 @@ byte 6 through 17: from the EEPROM - device description
 byte 18: from the EEPROM - device number
 byte 19: CRC
 
+
 Note there are a suite of sketches for the user to add sensors to the system, input a sensor 
 description, and to select the sensor's upper and lower temperature alarm settings, and the
-sensor's resolution.  Refer to thepiandi.blogspot.com.
+sensor's resolution.  There is another sketch for calibrating the sensors at 0 and 100 degrees C.
+Refer to thepiandi.blogspot.com.
 
 Foe each sensor to be run:
 1.  The ROM code is retrieved from the EEPROM
@@ -55,10 +63,12 @@ Foe each sensor to be run:
 
 Once the temperature is converted the following occurs:
 1.  The scratchpad is downloaded
-2.  Switch is checked to see if it is pressed.
-3.  If the LCD selection matches the sensor that is being transmitted, the sensor's
+2.  Temperature is calculated from the scratchpad data
+3.  Temperature is corrected using the upper and low calibratiion factors.
+4.  Switch is checked to see if it is pressed.
+5.  If the LCD selection matches the sensor that is being transmitted, the sensor's
 description and current temperature is displayed.
-4.	Data is transmitted as described next:
+6.  Data is transmitted as described next:
 
 The transmission sequence is as follows: data starts with a 101010 pattern followed by 
 eight synchronization bits: 11110000, and the two bits: 10.  This is followed by
@@ -75,8 +85,6 @@ When the last bit of the last byte has been transmitted, the line is pulled low,
 it stays until the next temperature conversion is completed.  The data transmission
 starts anew with the next sensor.
 
-
-MJL - thepiandi.blogspot.com   02/15/15
 */
 #include "One_wire_DS18B20.h"
 #include "EEPROM_Functions.h"
@@ -194,7 +202,7 @@ void detect_devices(){
   }
 
   for (i = 0; i < stored_devices; i++){
-    address = 20 * i + 4;   //Get ROM code from EEPROM
+    address = 22 * i + 4;   //Get ROM code from EEPROM
     for (j = 0; j < 8; j++){
       rom[j] = eeprom.EEPROM_read(address + j);
     } 
@@ -288,6 +296,33 @@ void convert_temp_to_array(float temp_f){
   disp_temp[8] = '\n';
 }
 
+/*---------------------------------------------apply_calibratiom-----------------------------------*/
+float apply_calibration(byte cal_hi, byte cal_lo, float measured){
+  float corrected_temp, correction_hi, correction_lo;
+  int cal_hi_int, cal_lo_int;
+  
+  //get 100 degree C. temperature correction
+  cal_hi_int = cal_hi;
+  
+  //check if negative
+  if (cal_hi_int > 128){
+    cal_hi_int += 65280;
+  }
+  correction_hi = cal_hi_int / 16.0;
+
+  //get 0 degree C. temperature correction
+  cal_lo_int = cal_lo;
+  
+  //check if negative
+  if (cal_lo_int > 128){
+    cal_lo_int += 65280;
+  }
+  correction_lo = cal_lo_int / 16.0;
+  
+  corrected_temp = measured - (measured * ( correction_hi - correction_lo ) / 100.00 + correction_lo);
+  
+  return corrected_temp;
+}
 
 /*_________________________________________MAIN PROGRAM__________________________________*/
 /*---------------------------------------------setup-------------------------------------*/
@@ -315,12 +350,13 @@ void loop(){
   int resolution;
   int sequence = 1;
   char display_description[13];
-  float temp_c, temp_f;
+  float temp_c, corrected_temp_c, temp_f;
   boolean spaces;
+  byte cal_factor_lo, cal_factor_hi;
   
   for (j = 0; j < stored_devices; j++){  
     if (devices2run[j]){  //check to see if device is to be run
-      address = 20 * j +4;   //Get ROM code from EEPROM
+      address = 22 * j +4;   //Get ROM code from EEPROM
       for (k = 0; k < 8; k++){
         rom[k] = eeprom.EEPROM_read(address + k);
       } 
@@ -334,7 +370,12 @@ void loop(){
         }
       }
       
-      //Determine the resolution.  
+      //Get upper and lower calibration factors
+      address += 12;
+      cal_factor_lo = eeprom.EEPROM_read(address);
+      cal_factor_hi = eeprom.EEPROM_read(address + 1);
+        
+     //Determine the resolution.  
       if (parasitic){
         //If parasitic operation then must find resolution for each device
         //Match ROM followed by read Scratchpad for resolution
@@ -398,6 +439,7 @@ void loop(){
           temp_c -= 65536;          //calculates 2's complement
         }
         temp_c /= 16.0;
+        corrected_temp_c = apply_calibration(cal_factor_hi, cal_factor_lo, temp_c);
         temp_f = 1.8 * temp_c + 32.0;
         
         convert_temp_to_array(temp_f);
